@@ -1,0 +1,42 @@
+\documentclass{thesis}
+
+\usepackage{lipsum}
+
+\title{Pico's Thesis}
+
+\author{Valentino Picotti}
+\course{Informatica}
+\supervisor{Prof.\ Marino Miculan, Ph.D.}
+\cosupervisor{Marco Peressotti \and Nicola Gigante}
+
+\begin{document}
+
+\maketitle
+
+\begin{dedication}
+Alla mamma <3
+\end{dedication}
+
+\begin{abstract}[italian]
+\input{abstract_it.tex}
+\end{abstract}
+
+\begin{abstract}
+\input{abstract_en.tex}
+\end{abstract}
+
+\begin{acknowledgements}[italian]
+\input{ack.tex}
+\end{acknowledgements}
+
+\tableofcontents
+
+\mainmatter
+\input{introduction.tex}
+
+\backmatter
+\bibliography{bibliography}
+\printindex
+
+\end{document}
+
