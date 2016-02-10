@@ -10,5 +10,9 @@
         "*.idx", "*.ilg", "*.ind", ".gitignore"
       ]
 		}
-	]
+	],
+    "settings" :
+    {
+        "word_wrap": true
+    }
 }

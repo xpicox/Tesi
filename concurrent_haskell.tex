@@ -1,0 +1,39 @@
+%!TEX root = thesis.tex
+
+\chapter{Haskell and Concurrency}
+
+Haskell is a functional programming language, whose syntax and semantics are defined in the "Haskell Report" of which the latest revision is Haskell 2010 \cite{Marlow_haskell2010}. Haskell was created by several academic researchers interested in functional languages, to address the lack of of a common language that could be used as a focus for their research.
+
+Two features make it stand out amongst the programming languages crowd:
+\begin{itemize}
+\item It is \emph{purely functional}, \ie functions can not have side effects or mutate data; for a given input a function always gives the same result.
+\item It is \emph{lazy}. Unlike the majority of the programming languages, Haskell does not use strict evaluation: an evaluation strategy in which the arguments of a function are evaluated before the function is called. In Haskell the arguments to a function are passed \emph{unevaluated}, and only evaluated on demand.
+\end{itemize}
+
+Next: IO does not fit the functional paradigm because no side effects are permitted and IO requires strictness and laziness gives deliberately unspecified order of evaluation. \cite{PeytonJones:1993:IFP:158511.158524}
+% \url{https://wiki.haskell.org/IO_inside#Haskell_is_a_pure_language}
+% pure lazy functional language:
+% - side effects only inside monads
+% - References to mutable cells
+
+
+% Haskell was born as pure lazy functional programming language; side effects are 
+
+
+% Haskell is a lazy functional programming language in which functions with side effects are enclosed inside monads. For instance, I/O actions have type \emph{IO a} and can be combined together by the monadic bind combinator \textgreater \textgreater =. Inside the IO monad can leave also mutable cells. A cell holding values of type a has type IORef a and may be interacted with only via the following operations:
+
+% \begin{lstlisting}
+% newIORef :: a -> IO (IORef a)
+% readIORed :: IORef a -> IO a
+% writeIORef :: IORef a -> a -> IO ()
+% \end{lstlisting}
+
+% Concurrent Haskell is the collective name for the facilities that Haskell provides for programming with \emph{internal concurrency}.
+% It extends the Haskell 98 Language Report adding explicit concurrency primitives to the IO Monad. 
+
+
+% This primitives are:
+% \begin{lstlisting}
+% forkIO :: IO a -> IO ThreadId
+% \end{lstlisting}
+% that takes an IO action as an argument and executes that action in a new concurrent thread.

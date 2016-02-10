@@ -1,0 +1,29 @@
+%!TEX root = thesis.tex
+
+\chapter{Analysis}
+
+The first implementation, proposed by \citet{Toneguzzo}, made a heavy use of Haskell STM: all the operations performed on shared data structures were executed by STM transactions. Since this work aims to be an alternative to STM, we decided to set up a new implementation that does not have the STM as a dependency. This led us to thoroughly study STM and the GHC internals.
+
+
+\section{The Glasgow Haskell Compiler}
+Althought there are several Haskell compilers, the Glasgow Haskell Compiler (GHC) is the reference compiler of Haskell. GHC was started as part of an academic research project with several goals in mind, one of which was to provide a modular foundation that researchers can extend and develop.
+
+At the highest level GHC can be divided into two parts:
+\begin{itemize}
+ \item The compiler itself. This is an Haskell program whose job is to convert Haskell source code into executable machine code.
+ \item The Runtime System (RTS). This is a large library of C code that handles all the tasks associated with running the compiled Haskell code, including garbage collection, thread scheduling, profiling, exception handling. The RTS is linked into every compiled Haskell program.
+ \end{itemize}
+The compilation route of a source file involves severals phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, transalting Haskell syntax into a much smaller language called \emph{Core}. 
+c\newline\newline
+Heap objects:
+
+\url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects?redirectedfrom=Commentary/Rts/HeapObjects#InfoTables}
+\\
+every heap allocated object whether a head normal form or a thunk  is represented uniformly by a code pointer together with zero or more fields which give the values of the free variables of the code. \cite{export:67083}
+
+Threads, Capabilities..:
+[ one OSThread per Capability although during the course of running the program more OS threads might be created in order to continue running Haskell code while foreign calls execute. ]
+\url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Scheduler}
+
+E infine dove stà STM?
+\url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/STM}
