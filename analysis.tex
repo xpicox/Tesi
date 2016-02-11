@@ -6,15 +6,15 @@ The first implementation, proposed by \citet{Toneguzzo}, made a heavy use of Has
 
 
 \section{The Glasgow Haskell Compiler}
-Althought there are several Haskell compilers, the Glasgow Haskell Compiler (GHC) is the reference compiler of Haskell. GHC was started as part of an academic research project with several goals in mind, one of which was to provide a modular foundation that researchers can extend and develop.
+Although there are several Haskell compilers, the Glasgow Haskell Compiler (GHC) is the reference compiler of Haskell. GHC was started as part of an academic research project with several goals in mind, one of which was to provide a modular foundation that researchers can extend and develop.
 
 At the highest level GHC can be divided into two parts:
 \begin{itemize}
  \item The compiler itself. This is an Haskell program whose job is to convert Haskell source code into executable machine code.
  \item The Runtime System (RTS). This is a large library of C code that handles all the tasks associated with running the compiled Haskell code, including garbage collection, thread scheduling, profiling, exception handling. The RTS is linked into every compiled Haskell program.
  \end{itemize}
-The compilation route of a source file involves severals phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, transalting Haskell syntax into a much smaller language called \emph{Core}. 
-c\newline\newline
+The compilation route of a source file involves several phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, translating Haskell syntax into a much smaller language called \emph{Core}. The next phase is the optimization one: there are about six passes of optimization each of which takes \emph{Core} and produces \emph{Core}; in this phase, optimizations like dead code elimination, constants propagation or function inlining are applied to the program. Once the \emph{Core} program has been optimized, the process of code generation begins. The code generator first converts the \emph{Core} into a language called \emph{STG}, which is essentially just \emph{Core} annotated with more information required by the code generator. Then, \emph{STG} is translated to \emph{Cmm}, a low-level imperative language with an explicit stack. Finally, the \emph{Cmm} is converted to LLVM code (IR) and passed to the LLVM compiler that produces the native code.\newline\newline
+
 Heap objects:
 
 \url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects?redirectedfrom=Commentary/Rts/HeapObjects#InfoTables}
