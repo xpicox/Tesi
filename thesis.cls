@@ -329,6 +329,10 @@
 \newfake{section}
 \newfake{subsection}
 
+\newcommand\todo[1]{%
+  \footnote{\textcolor{red}{#1}}%
+  \PackageWarning{thesis}{Nota TODO ancora presente}%
+}
 % Numeric sets
 \newcommand\N{\mathbb{N}}
 \newcommand\Z{\mathbb{Z}}
