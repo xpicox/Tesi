@@ -27,8 +27,7 @@ Every \emph{Closure} is a contiguous block of memory, consisting of a fixed-form
 The most important part of the header is the \emph{info pointer},  which points to the info table for the closure.
 
 The \emph{info table} contains all the information that the runtime needs to know about the closure.
-Info tables are contiguous blocks of memory that, in addition to provide informations for the storage manager, contain the type of the closure and the \emph{entry code}, \ie the machine code that will evaluate the closure.
-\todo{Aggiungere schema Closure + Info Table. Vedi GHC Commentary: \url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects?redirectedfrom=Commentary/Rts/HeapObjects} }
+Info tables are contiguous blocks of memory that, in addition to provide informations for the storage manager, contain the type of the closure and the \emph{entry code}, \ie the machine code that will evaluate the closure.\todo{Aggiungere schema Closure + Info Table. Vedi GHC Commentary: \url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects?redirectedfrom=Commentary/Rts/HeapObjects} }
 
 Heap objects can be classified in:
 \begin{itemize}
@@ -58,6 +57,7 @@ The RTS provides a platform-independent abstraction layer for OS threads, \ie ke
 \item To support non-blocking foreign calls, \ie calls to functions defined in an another language
 \item To support SMP parallelism
 \end{itemize}
+
 When running on an SMP architecture, the RTS starts by creating the number of OS threads specified by the compiler flag +RTS -N, although during the course of running the program more OS threads might be created in order to continue running Haskell code while foreign calls execute.
 
 For each OS Thread known to the runtime, a \emphidx{Task} structure is created. A \emphidx{Task} is a further layer of abstraction over an OS thread; it contains not only a reference to the associated OS Thread, but also a mutex and a condition variable used when OS threads in the runtime need to synchronize with each other or sleep waiting for a condition to occur.
@@ -93,6 +93,7 @@ These two values are identical in the case a TVar has been read but not written 
 Within a memory transaction, all TVar accesses are performed by the primitive operations stg\_readTVarzh and stg\_writeTVarzh. These accesses remain buffered within the thread’s log, and hence invisible to other threads, until the transaction commits: writes are made to the log, and reads first consult the log so that they see preceding writes from the same transaction.
 
 \subsection{Validation and commit}
+
 The \emph{atomically} (stg\_atomicallyzh PrimOp) function operates by pushing an \emphidx{AtomicallyFrame} entry onto the Haskell execution stack, and invoking stmStartTransaction to allocate a fresh transactional record.
 When execution returns to the \emph{AtomicallyFrame}, the log is validated to check that it reflects a consistent view of memory.
 For each log entry, validation checks that the old value is pointer-equal to the current contents of the TVar.
@@ -115,6 +116,7 @@ If either alternative completes without retrying then the nested transaction is 
 \end{itemize}
 
 \section{Foreign Function Interface}
+
 The Foreign Function Interface (FFI) allows Haskell programs to cooperate with libraries written in C.
 Haskell programs can call foreign functions and foreign functions can call Haskell code.
 The FFI defines the marshaling for some boxed types such us Int, Double, Char and exports un-boxed foreign types that map directly to C types such as Int64, for signed 64-bit integers, Word64, for unsigned 64-bit integers, Ptr a, for pointers, and FunPtr a, for function pointers.
@@ -127,9 +129,15 @@ This behavior is called \emph{safe} because if the C calls blocks for a long tim
 \item If the import is marked as \emph{unsafe} then the function is executed by the same OS thread that was executing the Haskell code that made the call. An unsafe call is faster, but can block a capability and possibly block the entire Haskell program.
 \end{itemize}
 
-Since the majority of foreign functions have side effects, they live inside the IO monad as functions that return a value of type IO a; the foreign import can be marked as \emph{pure} and the function will return a pure value and is programmer duty to ensure that there are no side effects, because in a pure environment the strict order execution guarantee is lost.
+Since the majority of foreign functions have side effects, they live inside the IO monad as functions that return a value of type IO a. The foreign import can be marked as \emph{pure} and the function will return a \emph{pure value}: is programmer's duty to ensure that there are no side effects, because, in a pure environment, the strict order execution guarantee is lost.
 
-%The FFI implements the C calling convection but does not support structured types passed by value.
+Finally, the FFI defines two kinds of pointers that rule the memory management of a pointed objects:
+\begin{itemize}
+\item \emphidx{Foreign Pointers} represent references to objects that are maintained in a foreign language, \ie that are not part of memory managed by the Haskell storage manager.
+The essential difference between a foreign pointer and a raw pointer is that the former may be associated with a \emph{finalizer}, \ie, a routine that is invoked when the Haskell storage manager detects that there are no more references left that are pointing to the \emph{Foreign Pointer}.
+So the \emph{finalizer} is responsible to free the resource bound to the foreign pointer. \todo{Forse si potrebbe aggiungere la firma di newForeignPtr}
 
-\todo{Stable pointers to pass haskell objects to C}
-\todo{Foreign Pointers add finalization support for haskell references to external objects}
+\item \emphidx{Stable Pointers} resolve the dual problem: the life span of an Haskell object is no longer managed by the storage manager, indeed it becomes responsibility of the programmer to release the resource.
+The function \emph{newStablePtr} creates a stable pointer referring to the given Haskell value and as long as \emph{freeStablePtr} is not called, that pointer will remain valid.
+So a \emph{Stable Pointer} is a reference to a Haskell expression that is guaranteed not to be affected by garbage collection, i.e., it will neither be deallocated nor will the value of the stable pointer itself change during garbage collection. \emph{Stable Pointers} can be passed to foreign code, which can treat it as an opaque reference to a Haskell value. \todo{Forse si potrebbe aggiungere le firme di newStablePtr e freeStablePtr}
+\end{itemize}
