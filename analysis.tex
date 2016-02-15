@@ -74,7 +74,7 @@ The main components of a Capability are:
 \item A queue of runnable Haskell threads, called the run queue.
 \end{itemize}
 
-\section{Haskell STM}
+\section{Software Transactional Memory}
 Among the features offered by the RTS, there is also the support for GHC's Software Transactional Memory implementation.
 This implementation is split into two layers.
 The top layer implements the STM operations described in \ref{cc}.
@@ -98,7 +98,7 @@ When execution returns to the \emph{AtomicallyFrame}, the log is validated to ch
 For each log entry, validation checks that the old value is pointer-equal to the current contents of the TVar.
 If validation succeeds, stmCommitTransaction proceeds applying the changes to the heap. Otherwise, the TRec is discarded, a fresh transaction is started and the atomic block re-executed.
 This entire validate-and-then-commit sequence is carried out atomically with respect to all other threads with an incremental lock of the TVars belonging to the write set of the transaction in the validation phase (see validate\_and\_acquire\_ownership STM.c).
-Since the AtomicallyFrame is a closure, validation and commit are performed by the entry code of the frame's info table.
+Since the \emph{AtomicallyFrame} is a closure, validation and commit are performed by the entry code of the frame's info table.
 
 The mechanism of nested transactions works in a similar way: the \emph{orElse} function pushes onto the stack a \emphidx{CatchRetryFrame}, a closure whose entry code will perform the validation of the nested transactions.
 
@@ -111,6 +111,25 @@ In the consistent case, it allocates new \emph{wait-queue entries}, held in  lis
 Once this is done, the calling thread is responsible for blocking itself and reentering the scheduler. The wait queue entries are noticed by a commit which updates the TVars: the updater unblocks any waiters it encounters.
 \item
 If the frame is a \emph{CatchRetryFrame} and the \emph{retry} is called by the first transaction of the \emph{orElse} then the TRec is discarded and the second transaction is started. If also the second transaction calls a \emph{retry}, the \emph{retry} is propagated further.
-If either alternative completes without retrying then the nested transaction is validated by calling stmCommitNestedTransaction to check that it has seen a consistent view of the heap. Validating a nested transaction, validates also its enclosing transactions: if any of them has become invalid by a concurrent update then the whole atomic function re-executes with a fresh log.  If the nested transaction is valid then the TRecs are merged: if the parent already contains an entry for the TVar involved then the only the \emph{new value} is copied from the nested TRec, otherwise the entire entry is copied.
+If either alternative completes without retrying then the nested transaction is validated by calling stmCommitNestedTransaction to check that it has seen a consistent view of the heap. Validating a nested transaction, validates also its enclosing transactions: if any of them has become invalid by a concurrent update then the whole atomic block re-executes with a fresh log.  If the nested transaction is valid then the TRecs are merged: if the parent already contains an entry for the TVar involved then only the \emph{new value} is copied from the nested TRec, otherwise the entire entry is copied.
 \end{itemize}
-\newpage
+
+\section{Foreign Function Interface}
+The Foreign Function Interface (FFI) allows Haskell programs to cooperate with libraries written in C.
+Haskell programs can call foreign functions and foreign functions can call Haskell code.
+The FFI defines the marshaling for some boxed types such us Int, Double, Char and exports un-boxed foreign types that map directly to C types such as Int64, for signed 64-bit integers, Word64, for unsigned 64-bit integers, Ptr a, for pointers, and FunPtr a, for function pointers.
+
+The syntax for declaring a foreign import let decide the behavior of the runtime when a call to the C function is made:
+\begin{itemize}
+\item If the import is marked as \emph{safe}, then the runtime pushes the arguments onto the Haskell stack and returns a C function descriptor to the scheduler.
+The scheduler suspends the Haskell thread, spawns a new OS thread which pops the arguments off the Haskell stack onto the C stack, calls the C function, pushes the result onto the Haskell stack and informs the scheduler that the C function has completed and the Haskell thread is now runnable.
+This behavior is called \emph{safe} because if the C calls blocks for a long time, the capability from which the call was made can continue to execute Haskell threads on its OS thread.
+\item If the import is marked as \emph{unsafe} then the function is executed by the same OS thread that was executing the Haskell code that made the call. An unsafe call is faster, but can block a capability and possibly block the entire Haskell program.
+\end{itemize}
+
+Since the majority of foreign functions have side effects, they live inside the IO monad as functions that return a value of type IO a; the foreign import can be marked as \emph{pure} and the function will return a pure value and is programmer duty to ensure that there are no side effects, because in a pure environment the strict order execution guarantee is lost.
+
+%The FFI implements the C calling convection but does not support structured types passed by value.
+
+\todo{Stable pointers to pass haskell objects to C}
+\todo{Foreign Pointers add finalization support for haskell references to external objects}
