@@ -132,6 +132,7 @@ This behavior is called \emph{safe} because if the C calls blocks for a long tim
 Since the majority of foreign functions have side effects, they live inside the IO monad as functions that return a value of type IO a. The foreign import can be marked as \emph{pure} and the function will return a \emph{pure value}: is programmer's duty to ensure that there are no side effects, because, in a pure environment, the strict order execution guarantee is lost.
 
 Finally, the FFI defines two kinds of pointers that rule the memory management of a pointed objects:
+
 \begin{itemize}
 \item \emphidx{Foreign Pointers} represent references to objects that are maintained in a foreign language, \ie that are not part of memory managed by the Haskell storage manager.
 The essential difference between a foreign pointer and a raw pointer is that the former may be associated with a \emph{finalizer}, \ie, a routine that is invoked when the Haskell storage manager detects that there are no more references left that are pointing to the \emph{Foreign Pointer}.

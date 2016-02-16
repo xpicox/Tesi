@@ -1,0 +1,15 @@
+%!TEX root = thesis.tex
+
+\chapter{Implementation}
+
+At an high level the implementation is subdivided in an Haskell library and a C library.
+The data structures, as well as the operations on them, are defined in the C Header file OTM.h and made available to the Haskell code through the Foreign Function Interface.
+Since the FFI does not provide a type safe marshaling for pointers, we decided to introduce the C2HS preprocessor to our build scheme.
+All the foreign declarations reside in the file Internals.chs and are written with the syntax of C2HS.\cite{Chakravarty2000}
+Finally the OTM interface is exposed by the the Haskell module Control.Monad.OTM defined in the file OTM.hs.
+
+\section{Monads TM, OTM and ITM}
+The \emph{TM Monad} is the hearth of our transactional memory implementation; monadic actions of type \emph{TM a} represent transactions that when performed will return a value of type \emph{a}. 
+The type \emph{TM a} is a monadic action that represent a transaction.
+If wrapped inside the OTM monad the transaction will work on the shared memory otherwise, if wrapped inside the ITM monad
+TM is a type synonym for a stack of monad transformers: at the lowest level of the stack, there is the IO Monad that allows to call foreign functions; on top of it, there is the ExceptT monad transformer that adds exception handling to the computations; at top of the transformers stack there is a StateT transformer that adds a mutable state to the underlying monads.
