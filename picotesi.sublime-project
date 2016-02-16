@@ -13,6 +13,7 @@
 	],
     "settings" :
     {
-        "word_wrap": true
+        "word_wrap": true,
+        "gutter" : true
     }
 }

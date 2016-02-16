@@ -6,10 +6,26 @@ At an high level the implementation is subdivided in an Haskell library and a C 
 The data structures, as well as the operations on them, are defined in the C Header file OTM.h and made available to the Haskell code through the Foreign Function Interface.
 Since the FFI does not provide a type safe marshaling for pointers, we decided to introduce the C2HS preprocessor to our build scheme.
 All the foreign declarations reside in the file Internals.chs and are written with the syntax of C2HS.\cite{Chakravarty2000}
-Finally the OTM interface is exposed by the the Haskell module Control.Monad.OTM defined in the file OTM.hs.
+Finally the OTM interface is exposed by the the Haskell module Control.Monad.OTM and defined in the file OTM.hs.
 
 \section{Monads TM, OTM and ITM}
-The \emph{TM Monad} is the hearth of our transactional memory implementation; monadic actions of type \emph{TM a} represent transactions that when performed will return a value of type \emph{a}. 
-The type \emph{TM a} is a monadic action that represent a transaction.
-If wrapped inside the OTM monad the transaction will work on the shared memory otherwise, if wrapped inside the ITM monad
-TM is a type synonym for a stack of monad transformers: at the lowest level of the stack, there is the IO Monad that allows to call foreign functions; on top of it, there is the ExceptT monad transformer that adds exception handling to the computations; at top of the transformers stack there is a StateT transformer that adds a mutable state to the underlying monads.
+
+The \emph{TM Monad} is the hearth of our transactional memory implementation;
+the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
+% monadic actions of type \emph{TM a} represent transactions that when performed will return a value of type \emph{a}.
+
+The \emph{TM Monad} is a type synonym for a stack of monad transformers that solve the following constraints:
+reads and writes are foreign functions with side effects, thus the IO monad is the innermost;
+transactions may explicitly fail, \ie, call \emph{retry}, thus the \emph{ExceptT} monad transformer allows computations to terminate with an exceptional value,
+furthermore transactions need to keep track of their state, reads and tentative writes, thus the \emph{StateT} monad transformer adds a transactional log as the state of the computation.
+
+\subsection{Transactional record and OTVars}
+
+The transactional record contains an entry for each \emph{OTVar} that the transaction has accessed.
+Each entry in the transactional log is an \emph{OTRecEntry} that contains a reference to the \emph{OTVar} involved and two additional fields used only by \emph{Isolated Transaction}.
+This additional fields, that contain the \emph{old value} held in the \emph{OTVar} when it was first accessed and the \emph{new value} to be committed if the validation succeeds, represent the working memory of an isolated transaction.
+
+The accesses to OTVars performed by isolated transactions remain buffered within the transactional record and invisible to other threads until the transaction commit. \emph{Open Transactions}, instead, perform this accesses in a shared working memory, that we call \emph{OTVarDelta} or \emph{delta memory}, retained directly by the \emph{OTVar}.
+
+\todo{Le Otvar gestiscono oggetti haskell quindi usa gl stable pointer, ma siccome potrei avere più riferimenti allo stesso oggetto uso ref counting sugli stapleptr}
+\todo{Transaction life cycle qui oppure quando parlo di fusioni? (fore non è male finere con il discorso delle otvar)}
