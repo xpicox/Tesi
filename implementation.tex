@@ -71,5 +71,19 @@ In the validation phase of these transactions, each \emph{OTVar} in the transact
 The lock is a tentative lock, so either is not acquired or the current value is different from the expected one, the transaction validation fails.
 If the validation succeeds, the writes in the log are made visible to other threads committing the changes in the OTVars shared memory. Since an isolated transaction is nested inside an open transaction, the commit of an isolated transaction can trigger merges between open transactions.
 
-\section{Merges}
-\todo{Unions, merges (find lock free)+ explain read an write}
+\section{Merge of transactions}
+
+Transaction merging is triggered by operations on the shared memory.
+This operations are read and writes of \emph{OTVar}s in the OTM monad, and commits of isolated transactions.
+
+The first time an \emph{OTVar} is accessed, it is \emph{acquired} by the transaction that requested the operation: its \emph{delta memory}, initially empty, is filled in with an \emph{OTVarDelta} containing the \emph{shared value} and a reference to the transaction which is acquiring the variable.
+The acquiring phase is implemented with a \emph{compare\&swap}: if it fails then the \emph{OTVar} is already been acquired by another transaction.
+
+When a transaction reads or writes an owned \emph{OTVar}, the function \emph{otmUnion} is called.
+To represent transaction merges we opted for a Union-Find data structure with the heuristics of \emph{path compression} and \emph{union by rank}.
+Each transactional record has a \emph{forward transaction} field that stores the information needed by the data structure: the \emph{rank} of that node and a reference to the \emph{root} of the set.
+We followed the implementation proposed by \citet{Anderson94wait-freeparallel} where operations on the data structure are lock free.
+Adapting their implementation to our needs, introduced the lock of the root nodes involved in the \emph{union} procedure, but \emph{find} operations are still lock free.
+
+After the \emph{otmUnion} have acquired the locks on the transactional records that have to be merge, union by rank is performed, and the number of running and participating threads of one transaction is added to those of the new root transaction.
+
