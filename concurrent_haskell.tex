@@ -2,7 +2,7 @@
 
 \chapter{Haskell and Concurrency}
 
-Haskell is a functional programming language, whose syntax and semantics are defined in the "Haskell Report" of which the latest revision is Haskell 2010 \cite{Marlow_haskell2010}. Haskell was created by several academic researchers interested in functional languages, to address the lack of of a common language that could be used as a focus for their research.
+Haskell is a functional programming language, whose syntax and semantics are defined in the ``Haskell Report'' of which the latest revision is Haskell 2010 \cite{Marlow_haskell2010}. Haskell was created by several academic researchers interested in functional languages, to address the lack of a common language that could be used as a focus for their research.
 
 Two features make it stand out amongst the programming languages crowd:
 \begin{itemize}
@@ -10,7 +10,33 @@ Two features make it stand out amongst the programming languages crowd:
 \item It is \emph{lazy}. Unlike the majority of the programming languages, Haskell does not use strict evaluation: an evaluation strategy in which the arguments of a function are evaluated before the function is called. In Haskell the arguments to a function are passed \emph{unevaluated}, and only evaluated on demand.
 \end{itemize}
 
-Next: IO does not fit the functional paradigm because no side effects are permitted and IO requires strictness and laziness gives deliberately unspecified order of evaluation. \cite{PeytonJones:1993:IFP:158511.158524} \todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
+I/O operations does not fit the functional paradigm because side effects are not permitted and laziness gives deliberately unspecified order of evaluation.
+
+In Haskell, reconcile I/O operations with this features has been achieved by means the IO monad.\cite{PeytonJones:1993:IFP:158511.158524}
+As shown in \cref{}, a value of type \emph{IO a} is a monadic action implemented as a function which takes as its input a value representing the entire current state of the world and returns a pair consisting of a value representing the new state of the world, and the result of type \emph{a}.
+This introduces \emph{data dependencies} between monadic actions, because each action depends on the \emph{RealWord} value computed by the previous one, hence, preventing the compiler from reordering actions, \emph{sequencing} is introduced for I/O operations.
+Besides I/O operations, values of IO include operations with side effects on mutable data types, \eg, a mutable variable ha type \emph{IORef a} and may be accessed only via the following operations:
+
+\begin{lstlisting}
+newIORef   :: a -> IO (IORef a)
+readIORef  :: IORef a -> IO a
+writeIORef :: IORef a -> a -> IO ()
+\end{lstlisting}
+
+Concurrent Haskell is the collective name for the facilities that Haskell provides for programming with \emph{internal concurrency}.
+It extends the Haskell Language Report adding explicit concurrency primitives to the IO Monad.
+
+\todo{A monad is \url{https://en.wikipedia.org/wiki/Monad\_(functional\_programming)\#Formal\_definition} data constructor, bind and return. Monad laws.
+A type to be defined a \emph{monad} must have the following components:
+\begin{itemize}
+\item A data constructor.
+\item A unit function that injects a type in the corresponding monadic type.
+\item A binding operation to combine two monadic actions.
+\end{itemize}
+}
+\todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
+
+
 % \url{https://wiki.haskell.org/IO_inside#Haskell_is_a_pure_language}
 % pure lazy functional language:
 % - side effects only inside monads
@@ -28,8 +54,8 @@ Next: IO does not fit the functional paradigm because no side effects are permit
 % writeIORef :: IORef a -> a -> IO ()
 % \end{lstlisting}
 
-% Concurrent Haskell is the collective name for the facilities that Haskell provides for programming with \emph{internal concurrency}.
-% It extends the Haskell 98 Language Report adding explicit concurrency primitives to the IO Monad. 
+% 
+%  
 
 
 % This primitives are:
