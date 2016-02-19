@@ -10,9 +10,18 @@ Two features make it stand out amongst the programming languages crowd:
 \item It is \emph{lazy}. Unlike the majority of the programming languages, Haskell does not use strict evaluation: an evaluation strategy in which the arguments of a function are evaluated before the function is called. In Haskell the arguments to a function are passed \emph{unevaluated}, and only evaluated on demand.
 \end{itemize}
 
-I/O operations does not fit the functional paradigm because side effects are not permitted and laziness gives deliberately unspecified order of evaluation.
+I/O operations do not fit the functional paradigm because side effects are not permitted and laziness gives deliberately unspecified order of evaluation.
 
 In Haskell, reconcile I/O operations with this features has been achieved by means the IO monad.\cite{PeytonJones:1993:IFP:158511.158524}
+\todo{A monad is \url{https://en.wikipedia.org/wiki/Monad\_(functional\_programming)\#Formal\_definition} data constructor, bind and return. Monad laws.
+A type to be defined a \emph{monad} must have the following components:
+\begin{itemize}
+\item A data constructor.
+\item A unit function that injects a type in the corresponding monadic type.
+\item A binding operation to combine two monadic actions.
+\end{itemize}
+}
+\todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
 As shown in \cref{}, a value of type \emph{IO a} is a monadic action implemented as a function which takes as its input a value representing the entire current state of the world and returns a pair consisting of a value representing the new state of the world, and the result of type \emph{a}.
 This introduces \emph{data dependencies} between monadic actions, because each action depends on the \emph{RealWord} value computed by the previous one, hence, preventing the compiler from reordering actions, \emph{sequencing} is introduced for I/O operations.
 Besides I/O operations, values of IO include operations with side effects on mutable data types, \eg, a mutable variable ha type \emph{IORef a} and may be accessed only via the following operations:
@@ -23,43 +32,74 @@ readIORef  :: IORef a -> IO a
 writeIORef :: IORef a -> a -> IO ()
 \end{lstlisting}
 
+\section{Concurrent Haskell}
 Concurrent Haskell is the collective name for the facilities that Haskell provides for programming with \emph{internal concurrency}.
 It extends the Haskell Language Report adding explicit concurrency primitives to the IO Monad.
+Haskell threads are created by \emph{forkIO} that takes as argument the IO computation to be performed independently from the main execution path.
+\begin{lstlisting}
+forkIO   :: IO () -> IO ThreadId
+\end{lstlisting}
 
-\todo{A monad is \url{https://en.wikipedia.org/wiki/Monad\_(functional\_programming)\#Formal\_definition} data constructor, bind and return. Monad laws.
-A type to be defined a \emph{monad} must have the following components:
-\begin{itemize}
-\item A data constructor.
-\item A unit function that injects a type in the corresponding monadic type.
-\item A binding operation to combine two monadic actions.
-\end{itemize}
-}
-\todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
+Thread safe communication and synchronization is achieved through \emph{MVars}.
+A value of type \emph{MVar a} is a mutable location that is either empty or full with a value of type \emph{a}.
+Interaction with \emph{MVars} is possible only with the primitives:
+\begin{lstlisting}
+takeMVar :: MVar a -> IO a
+putMVar  :: MVar a -> a -> IO ()
+\end{lstlisting}
+The first empties a full \emph{MVar}, if it is empty the thread waits until is filled. The second fills an empty \emph{MVar} and blocks the thread if it is full. \emph{MVars} can be though as one place channels, or as binary semaphores for thread synchronization.
 
+\section{Haskell STM}
 
-% \url{https://wiki.haskell.org/IO_inside#Haskell_is_a_pure_language}
-% pure lazy functional language:
-% - side effects only inside monads
-% - References to mutable cells
+Haskell STM is part of Concurrent Haskell, and adds \emph{transactional actions} that operate on \emph{transactional memory} for safe thread communication. Transactional memory locations are called \emph{transactional variables} or \emph{TVars}.
+Transactional actions have type \emph{STM a} and are combined sequentially with the bind operator.
+An STM action is provisional during its entire execution and its effects are exposed to the rest of the system by 
+\begin{lstlisting}
+atomically :: STM a -> IO a
+\end{lstlisting}
+which takes an STM action and delivers an I/O action that, when performed, runs the transaction guaranteeing atomicity and isolation with respect to the rest of the system.
+The type system ensure that IO actions can not be performed inside a transaction, so no irreversible side effects can occur inside the STM monad.
 
+\emph{Transactional variables} have type \emph{TVar a}, where \emph{a} is the type of the value they contain. \emph{TVars} are mutable variables so, like IORefs, they are manipulated only via the interface:
+\begin{lstlisting}
+newTVar   :: a -> STM (TVar a)
+readTVar  :: TVar a -> STM a
+writeTVar :: TVar a -> a -> STM ()
+\end{lstlisting}
 
-% Haskell was born as pure lazy functional programming language; side effects are 
+Reads and writes on transactional variables can be combined with the monadic bind operator to define a transactional update:
 
+\begin{lstlisting}
+modifyTVar :: TVar a -> (a -> a) -> STM ()
+modifyTVar var f = do
+    x <- readTVar var
+    writeTVar var (f x)
+\end{lstlisting}
 
-% Haskell is a lazy functional programming language in which functions with side effects are enclosed inside monads. For instance, I/O actions have type \emph{IO a} and can be combined together by the monadic bind combinator \textgreater \textgreater =. Inside the IO monad can leave also mutable cells. A cell holding values of type a has type IORef a and may be interacted with only via the following operations:
+Then, \emph{atomically (modifyTVar x f)} delivers an IO action that applies \emph{f} to the value held by \emph{x} and updates the variable accordingly as a single atomic isolated operation.
 
-% \begin{lstlisting}
-% newIORef :: a -> IO (IORef a)
-% readIORed :: IORef a -> IO a
-% writeIORef :: IORef a -> a -> IO ()
-% \end{lstlisting}
+Besides transactional memory interaction, STM allows also for \emph{composable blocking} of transactions with the primitive:
 
-% 
-%  
+\begin{lstlisting}
+retry :: STM a
+\end{lstlisting}
 
+The composability property, comes from its type that allows the primitive to be used wherever an STM action may occur.
+The semantic of \emph{retry} is to abort the transaction and re-run it after at least one of the transactional variables it has read from has been updated.
+As shown in \cite{Harris:2005:CMT:1065944.1065952}, this blocking primitive is enough to implement \emph{MVars} using STM: a value of type \emph{MVar a} is a transactional variable holding a value of type \emph{Maybe a}, i.e. a type that is either \emph{Nothing} or actually holds something of type \emph{a}. A thread applying \emph{takeMVar} to an empty \emph{MVar} is effectively blocked since it retries the transaction upon reading \emph{Nothing} and then it is not rescheduled until the content of the transactional variable changes:
 
-% This primitives are:
-% \begin{lstlisting}
-% forkIO :: IO a -> IO ThreadId
-% \end{lstlisting}
-% that takes an IO action as an argument and executes that action in a new concurrent thread.
+\begin{lstlisting}
+type MVar a = TVar (Maybe a)
+takeMVar v = do
+    m <- readTVar v
+    case m of
+        Nothing -> retry
+        Just r -> writeTVar m Nothing >> return r
+\end{lstlisting}
+
+Besides the bind operator, that sequentially combines transactions, the primitive:
+\begin{lstlisting}
+orElse :: STM a -> STM a -> STM a
+\end{lstlisting}
+combines transactions as \emph{alternatives}. The \emph{orElse} executes the first transaction, if it retries then is abandoned with no effect.
+%In \cref{} is shown the interface of STM. Side effects of transactions on the transactional memory must be delivered through the \emph{atomically} function. A blocking mechanism is introduces 
