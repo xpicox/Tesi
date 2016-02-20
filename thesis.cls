@@ -339,3 +339,8 @@
 \newcommand\Q{\mathbb{Q}}
 \renewcommand\R{\mathbb{R}} % Already defined by the complexity package
 \renewcommand\C{\mathbb{C}} % but with other meanings
+
+% Code citation inside text
+\newcommand\textcode[1]{%
+  \emph{#1}%
+}

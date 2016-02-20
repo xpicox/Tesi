@@ -101,5 +101,6 @@ Besides the bind operator, that sequentially combines transactions, the primitiv
 \begin{lstlisting}
 orElse :: STM a -> STM a -> STM a
 \end{lstlisting}
-combines transactions as \emph{alternatives}. The \emph{orElse} executes the first transaction, if it retries then is abandoned with no effect.
+combines transactions as \emph{alternatives}. The \emph{orElse} executes the first transaction, if it retries then is abandoned with no effect and the second is started. If the second retries too, the entire call retries and waits on the variables read by either of the two nested transactions.  
+\todo{Esempio: filosofi?}
 %In \cref{} is shown the interface of STM. Side effects of transactions on the transactional memory must be delivered through the \emph{atomically} function. A blocking mechanism is introduces 

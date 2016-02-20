@@ -1,3 +1,159 @@
 %!TEX root = thesis.tex
 
 \chapter{Open Memory Transactions in Haskell}
+
+Haskell was chosen as the development language because of its very expressive type system that offers a perfect environment for studying the ideas of transactional memory.
+In \cite{Harris:2005:CMT:1065944.1065952} this has been used to single out computations which may be used in transactions, from those which can perform irreversible I/O effects. 
+In the implementation, this idea is further improved by using the type system to separate \emph{isolated} transactions from those who can interact, and hence be merged.
+
+\section{Transactional actions and variables}
+The key idea introduced by \citet{OpenTransactionsSpec} is to separate isolation from atomicity: isolation is a computational aspect that can be added to atomic transactions.
+Following this perspective, at the type system level we distinguish isolated atomic actions, represented as values of type \emph{ITM a}, and non isolated atomic actions, as values of type \emph{OTM a}. Actions can be sequentially composed with the corresponding bind operator preserving atomicity and, for ITM actions, isolation.
+
+The function \textcode{isolated} takes an isolated atomic action and delivers an atomic action whose effects are guaranteed to be executed in isolation with respect to other actions.
+Then, \emph{atomic} takes an atomic action and delivers an I/O action that when performed runs a transaction whose effects are kept tentative until it commits.
+Tentative effects are shared among all non isolated transactions. Values of type \emph{STM a} can be seen as values of type \emph{ITM a}: the I/O they deliver is the same, since \emph{atomically} can be expressed as:
+\begin{Verbatim}
+    atomically = atomic . isolated
+\end{Verbatim}
+
+Like \emph{STM}, \emph{OTM} provides a mechanism for safe thread
+communication by means of transactional variables called \emph{OTVars}
+which, differently from TVars, support \emph{open} transactions.
+These are values of type \emph{OTVar a} where \emph{a} is the type of value held.
+Creating, reading and writing \emph{OTVars} is done via the interface defined by the \emph{MonadTM} class shown in \cref{fig:base-interface}. 
+All these actions are both atomic and isolated, thus, when it comes to actions of type \emph{ITM a}, \emph{OTVars} are basically \emph{TVars};
+\eg \emph{modifyTVar} from \emph{STM} corresponds to:
+
+\begin{Verbatim}
+    modifyOTVar :: OTVar a -> (a -> a) -> ITM ()
+    modifyOTVar var f = do
+        x <- readOTVar var
+        writeOTVar var (f x) 
+\end{Verbatim}
+From its type it is immediate to see that the update is both atomic and isolated. In fact, read and write operations are glued together by the \textgreater \textgreater= combinator, preserving both properties.
+
+\section{Blocking}
+\emph{OTM} supports composable blocking via the primitive \textcode{retry}, 
+under \emph{STM} slogan ``a thread that has to be blocked because it has 
+been scheduled too soon''. As for \emph{STM}, retrying a transactional action 
+actually corresponds to block the threads on some condition. Both isolated and non-isolated transactions are instances of \emph{MonadTransaction} class described in \cref{fig:base-interface}.
+
+Checks may be declared as follows:
+\begin{Verbatim}[tabsize=3, xleftmargin=1ex, gobble=1]
+    check :: Bool -> ITM ()
+    check b = if b then return () else retry
+\end{Verbatim}
+and invariants on transactional variables can be easily checked by composing reads and checks as follow:
+\begin{Verbatim}
+    assertOTVar :: OTVar a -> (a -> Bool) -> ITM ()
+    assertOTVar var p = do
+        x <- readOTVar var
+        check (p x)
+\end{Verbatim}
+
+Synchronization primitives, such as semaphores, can be easily implemented with isolated actions.
+A semaphore is a counter with two fundamental operations: \emph{up} which increments the counter and \emph{down} which decrements the counter if it is not zero and blocks otherwise.
+Semaphores are implemented using \emph{OTM} as \emph{OTVars} holding a counter:
+\begin{Verbatim}[tabsize=3, xleftmargin=1ex, gobble=1]
+    type Semaphore = OTVar Int
+\end{Verbatim}
+Then, \textcode{up} and \textcode{down} are even more immediate than their description:
+\begin{Verbatim}
+    up :: Semaphore -> ITM ()
+    up var = modifyOTvar var (1+)
+
+    down :: Semaphore -> ITM ()
+    down var = do
+        assertOTVar var (> 0)
+        modifyOTVar var (-1+)
+\end{Verbatim}
+Both are atomic and isolated updates with the latter being guarded by a pre-condition.
+
+Actions can also be composed as \emph{alternatives} by means of the primitive \emph{orElse}. For instance, the following takes a family of semaphores and delivers an action that decrements one of them, and blocking only if none can be decremented:
+\begin{Verbatim}
+    downAny :: [Semaphore] -> ITM ()
+    downAny (x:xs) = down x `orElse` downAny xs
+    downAny [] = retry
+\end{Verbatim}
+
+\section{Thread interaction}
+
+The interchangeability of \emph{OTM} and \emph{STM} ends when isolation is dropped.
+\emph{OTM} offers shared \emph{OTVars} as a mechanism for safe \emph{transaction interaction}.
+This means that non-isolated transactional actions see the effects on shared variables of any other non-isolated transactional action, as they are performed concurrently on the same object.
+This introduces dependencies between concurrent tentative actions: an action can not make its effects permanent, if it depends on information produced by another action which fails to complete.
+\emph{OTM} guarantees coherence of transactional actions in presence of interaction through shared transactional variables.
+
+%Among several ways for threads to communicate and coordinate, OTVars enables loosely-coupled interaction right inside atomic actions taking the programming style of \emph{STM} a step further. 
+A synchronization scenario that highlights how \emph{OTM} can take the programming style of \emph{STM} a step further is described below.
+
+In this example a master process tries to outsource part of an atomic computation to some thread chosen from a worker pool; communication is coordinated by a pair of semaphores.
+This can be achieved straightforwardly using \emph{OTM}:\\
+
+
+\begin{minipage}{0.45\textwidth}
+\begin{Verbatim}
+        master c1 c2 = do
+            -- put request
+            isolated (up c1)
+            -- do something else
+            isolated (down c2)
+            -- get answer
+\end{Verbatim}
+\end{minipage}
+\begin{minipage}{0.45\textwidth}
+\begin{Verbatim}
+        worker c1 c2 = do
+            -- do something
+            isolated (down c1)
+            -- get request
+            -- put answer
+            isolated (up c2)
+\end{Verbatim}
+\end{minipage}
+\\
+
+Both functions deliver atomic actions that synchronize using
+\textcode{c1} and \textcode{c2}. 
+
+\begin{figure}
+    \centering
+    \begin{Verbatim}[tabsize=3, gobble=2]
+        data ITM a
+        data OTM a
+        -- henceforth, t is a placeholder for ITM or OTM --
+        
+        -- Sequencing, do notation ------------------------
+        (>>=)  :: t a -> (a -> t b) -> t b
+        return :: a -> t a
+        
+        -- Running isolated and atomic computations -------
+        atomic   :: OTM a -> IO a
+        isolated :: ITM a -> OTM a
+        
+        -- Composing transactions -------------------------
+        class (Monad m) => MonadTransaction m where
+            retry    :: m a
+            orElse   :: m a -> m a -> m a
+        
+        -- Exceptions -------------------------------------
+        throw :: Exception e => e -> t a
+        catch :: Exception e => t a -> (e -> t a) -> t a
+        
+        -- Threading --------------------------------------
+        fork :: OTM () -> OTM ThreadId
+        
+        -- Transactional memory ---------------------------
+        data OTVar a
+        class (Monad m) => MonadTM m where
+            newOTVar     :: a -> m (OTVar a)
+            readOTVar    :: OTVar a -> m a
+            writeOTVar   :: OTVar a -> a -> m ()
+
+    \end{Verbatim}
+    \caption{The base interface of OTM.}
+    \label{fig:base-interface}
+\end{figure}
+
+\section{Examples}
