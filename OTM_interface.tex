@@ -157,3 +157,272 @@ Both functions deliver atomic actions that synchronize using
 \end{figure}
 
 \section{Examples}
+\paragraph{Crowdfunding}
+In this example we consider a scenario in which
+one party needs to atomically acquire a given number 
+of resources which are offered by a dynamic group.
+For the sake of exposition we rephrase the example
+using the metaphor of a fundraiser's ``crowdfunding campaign'': 
+the resources to be acquired are the campaign goal
+and the resources are donated by a crowd of \emph{backers}.
+
+\begin{figure}
+    \centering
+    \begin{Verbatim}[tabsize=3, gobble=2]
+        type Account = OTVar Int
+        type Campaign = (Account, Int)
+
+        transfer :: Account -> Account -> Int -> ITM ()
+        transfer a1 a2 n = do
+            withdraw a1 n
+            deposit a2 n
+
+        newCampaign target = do
+            a <- newOTvar 0
+            return (a, target)
+        
+        backCampaign :: Account -> Campaign -> Int -> ITM ()
+        backCampaign a (a',_) k = transfer a a' k
+        
+        commitCampaign :: Account -> Campaign -> ITM ()
+        commitCampaign a (a', t) = do
+            x <- readOTVar a'
+            check (x >= t)
+            transfer a' a x
+    \end{Verbatim}
+    \caption{Crowdfunding.}
+    \label{fig:example-funding}
+\end{figure}
+
+Each participant has a bank account, i.e.~an OTVar holding an integer 
+representing its balance. Accounts have two operation \textcode{deposit} 
+and \textcode{withdraw} which are implemented on the lines of 
+\textcode{up} and \textcode{down}, respectively.
+A campaign have a temporary account to store funds
+before transferring them to the fundraiser that closes
+the campaign; this operation blocks until the goal 
+is met. % (for simplicity we omitted time constraints).
+Backer participants transfer a chosen amount of funds from their
+account to the campaign account, but the transfer is delayed until the campaign is closed. Notice that participants do not need to know each other to coordinate.
+The implementation is shown in Figure~\ref{fig:example-funding}.
+
+\paragraph{Thread barriers}
+Barriers are abstractions used to coordinate groups of threads;
+once reached a barrier, threads cannot cross it
+until all other participants reach the barrier. 
+Thread groups can be either dynamic or static, depending
+on whether threads may join % (and in some implementations leave)
+the group or not. Here we consider dynamic groups. 
+
+Threads interact with barriers through two base operations: \textcode{join} for  
+joining the group associated with the barrier and \textcode{await} for blocking 
+waiting all participants before crossing.
+
+\begin{figure}
+    \centering
+    \begin{Verbatim}[tabsize=3, gobble=2]
+        type Barrier = OTVar (Int, Int)
+
+        newBarrier :: ITM Barrier
+        newBarrier = newOTVar (0,0)    
+    
+        join :: Barrier -> ITM ()
+        join b = do
+            assertOTVar b nobodyWaiting
+            modifyOTVar b (bimap (1+) id)
+            
+        await :: Barrier -> OTM ()
+        await b = do
+            isolated $ modifyOTVar b (bimap (-1+) (1+))
+            isolated $ do
+                assertOTVar b nobodyRunning
+                modifyOTVar b (bimap id (-1+))
+        
+        nobodyRunning (r,_) = r == 0
+        nobodyWaiting (_,w) = w == 0
+        bimap f g (a, b) = (f a, g b)
+    \end{Verbatim}
+%    \begin{Verbatim}[tabsize=3, gobble=2]
+%        type Barrier = OTVar (Int, Int)
+%
+%        newBarrier :: ITM Barrier
+%        newBarrier = newOTVar (0,0)    
+%    
+%        join :: Barrier -> ITM ()
+%        join b = do
+%            assertOTVar b nobodyWaiting
+%            modifyOTVar b recordJoin
+%            
+%        await :: Barrier -> OTM ()
+%        await b = do
+%            isolated $ modifyOTVar b recordAwait
+%            isolated $ do
+%                assertOTVar b nobodyRunning
+%                modifyOTVar b recordLeave
+%        
+%        nobodyRunning (r,_) = r == 0
+%        nobodyWaiting (_,w) = w == 0
+%        recordJoin  (r,w) = (r+1,w)
+%        recordAwait (r,w) = (r-1,w+1)
+%        recordLeave (r,w) = (r,w-1)
+%    \end{Verbatim}
+%    \begin{Verbatim}[tabsize=3, gobble=2]
+%        type Barrier = (OTVar Int, OTVar Int)
+%
+%        newBarrier :: ITM Barrier
+%        newBarrier = do
+%            running <- newOTVar 0
+%            waiting <- newOTVar 0
+%            return (running,waiting)
+%            
+%        join :: Barrier -> ITM ()
+%        join (running,waiting) = do
+%            assertOTVar waiting (== 0)
+%            modifyOTVar running (1 +)
+%            
+%        await :: Barrier -> OTM ()
+%        await b = do
+%            isolated $ do
+%                modifyOTVar running (-1 +)
+%                modifyOTVar waiting (1 +)
+%            isolated $ do
+%                assertOTVar running (== 0)
+%                modifyOTVar waiting (-1 +)
+%    \end{Verbatim}
+    \caption{Thread barrier.}
+    \label{fig:example-barrier}
+\end{figure}
+
+Barriers can be implemented using \emph{OTM} in few lines as shown
+in Figure~\ref{fig:example-barrier}. A barrier is composed by
+a transactional variable holding a pair of counters 
+tracking the number of participating threads that are waiting
+or running. For the sake of simplicity, we prevent new joins 
+during barrier crossing.
+This is enforced by the assertion guarding the counter update
+performed by \textcode{join}. 
+Waiting and crossing correspond to the two isolated actions composing
+\textcode{await}: the first changes the state of the thread from
+running to waiting and the second ensures that all threads reached the barrier
+before crossing and decrementing the waiting counter.
+Differently from \textcode{join}, \textcode{await} cannot
+be isolated: isolation would prevent other
+participants from updating their state from ``running'' to ``waiting''.
+
+This implementation is meant as a way to coordinate
+concurrent transactional actions but it may be used
+for coordinating concurrent I/O actions as it is.
+The latter scenario could be implemented also using
+\emph{STM} although \textcode{await} would necessarily
+be an I/O action since it cannot be an
+isolated atomic action (i.e., of type \emph{STM\;a}).
+
+\paragraph{Atomic futures}
+Suppose we want to delegate some task to another thread and 
+then collect the result once it is ready. An intuitive way to 
+achieve this is by means of \emph{futures}, i.e.~``proxy results'' 
+that will be produced by the worker threads. 
+
+\begin{figure}
+    \centering
+    \begin{Verbatim}[tabsize=3, gobble=2]
+        type Future a = OTVar (Maybe a)
+        
+        spawn :: OTM a -> OTM (Future a)
+        spawn job = do 
+            future <- newOTVar Nothing
+            fork (worker future)
+            return future
+            where
+                worker :: Future a -> OTM ()
+                worker future = do 
+                    result <- job
+                    writeOTVar future (Just $! result)
+                    
+        getFuture :: Future a -> ITM a
+        getFuture f = 
+            v <- readOTVar f
+            case v of
+                Nothing -> retry
+                Just val -> return val        
+    \end{Verbatim}
+    \caption{Atomic futures.}%$
+    \vspace{-1ex}
+    \label{fig:example-futures}
+\end{figure}
+
+A future can be implemented in \emph{OTM} by a TVar
+holding a value of type \emph{Maybe a}: either it is
+``not-ready-yet'' (\textcode{Nothing}) or it holds something 
+of type \emph{a}.
+Future values are retrieved via \textcode{getFuture} which takes 
+a future and delivers an action that blocks until the value is
+ready and then produces the value.
+Futures are created by \textcode{spawn} which takes a transactional
+action to be performed by a forked (transactional) thread. 
+The full specification is in Figure~\ref{fig:example-futures}.
+
+\paragraph{Petri nets}
+Petri nets are a well-known (graphical) formal model for concurrent, discrete-event dynamic systems.
+A Petri net is readily implemented in \emph{OTM} 
+by representing each transition by a thread, and each place by a semaphore.
+Each thread repeatedly simulates the firing of the transition it 
+implements and updates its input and output places accordingly:
+putting and taking a token from a place correspond to 
+increasing (\textcode{up}) or decreasing (\textcode{down})
+its semaphore---the latter blocks if no tokens are available.
+These semaphore operations must be 
+performed atomically but not in isolation; in fact, 
+isolation would prevent transitions sharing a place to
+fire concurrently. 
+Using \emph{OTM}, all this is achieved in few lines:
+\begin{Verbatim}[tabsize=3, xleftmargin=1ex, gobble=1]
+    type Place = Semaphore
+    
+    transition :: [Place] -> [Place] -> IO ThreadId
+    transition inputs outputs = forkIO (forever fire)
+        where 
+            fire = atomic $ do
+                mapM_ (isolated . down) inputs
+                mapM_ (isolated . up)   outputs
+\end{Verbatim}
+%$
+Note that, since firing is atomic but not isolated,
+the above is an implementation of \emph{true concurrent} Petri nets, which is usually more difficult to achieve than interleaving semantics.
+
+For instance, consider the Petri net below:
+\\
+\noindent
+\begin{BVerbatim}[tabsize=3, xleftmargin=1ex, gobble=2]
+        main = do
+            p1 <- atomic (newPlace 1)
+            p2 <- atomic (newPlace 0)
+            p3 <- atomic (newPlace 0)
+            p4 <- atomic (newPlace 0)
+            transition [p1] [p3, p4]
+            transition [p1, p2] [p4]
+\end{BVerbatim}
+\hfill
+\begin{minipage}[t]{.33\linewidth}
+    \begin{tikzpicture}
+        \node [place,tokens=1, label=left:$p_1$] (p1) at (0,2) {};
+        \node [place, label=right:$p_2$] (p2) at (1,2) {};
+        
+        \node [place, label=left:$p_3$] (p3) at (0,0) {};
+        \node [place, label=right:$p_4$] (p4) at (1,0) {};
+        
+        \node [transition,label=left:$t_1$] (t1) at (0,1) {}
+            edge [pre]  (p1)
+            edge [post] (p3)
+            edge [post] (p4);
+        
+        \node [transition,label=right:$t_2$] (t2) at (1,1) {}
+            edge [pre]  (p1)
+            edge [pre]  (p2)
+            edge [post] (p4);
+    \end{tikzpicture}
+\end{minipage}
+\\[1ex]
+Since $p_1$ has only one token either $t_1$ or $t_2$ fires. In fact,
+whenever $t_2$ acquires the token it will fail to acquire the other
+from $p_2$ and hence its transaction retries releasing the token.
