@@ -28,7 +28,7 @@ This additional fields, that contain the \emph{old value} held in the \emph{OTVa
 The accesses to OTVars performed by isolated transactions remain buffered within the transactional record and invisible to other threads until the transaction commit. \emph{Open Transactions}, instead, perform this accesses in a shared working memory, that we call \emph{OTVarDelta} or \emph{delta memory}, retained directly by the \emph{OTVar}.
 
 Both \emph{OTVar} and \emph{OTRecEntry}, hold pointers to Haskell values. 
-As explained in \cref{ffi:stableptr}, this pointers must be \emph{Stable Pointers}: when we write values to an \emph{OTVar}, this values are wrapped inside a \emph{StablePtr}.
+As explained in \cref{ffi:stableptr}, this pointers must be \emph{Stable Pointers}: when we write a value in an \emph{OTVar}, this value is wrapped inside a \emph{StablePtr}.
 The same stable pointer could be copied in the working memory of several transactions, so reference counting is added to each pointer: when there are no more references left to a pointer, \emph{freeStablePtr} is called.
 
 The transactional record contains additional informations that describe the state of the transaction, \ie, in which phase of the life cycle it is, the number of total threads participating to this transaction and the number of threads that are still running.
@@ -41,12 +41,12 @@ The life-cycle of an \emph{Open Transaction} is quite complex compared to that o
 
 %In this automaton, each transition is labelled with a triple “a;;v” where a is the action (possibly with parameters), c is a condition under which the action can be taken, and ⃗v is the list of new values to put in the target state registers.
 
-The state of a running transition is \emph{Ru\textlangle n, l\textrangle}, where \emph{n} is the number of threads that have not already voted to commit, and \emph{l} is the total number of threads participating to the transaction.
+The state of a running transaction is \emph{Ru\textlangle n, l\textrangle}, where \emph{n} is the number of threads that have not already voted to commit, and \emph{l} is the total number of threads participating to the transaction.
 This is the only state where new threads can be merged to the transaction. When a transaction is created, its state is \emph{Ru\textlangle 1, 1\textrangle}.
 When another transaction is merged, we add the registers componentwise; when a thread returns and hence is ready to commit, \emph{n} is decremented.
-If it is the one that zeros n, the transaction is ready to commit: its state changes to \emph{Co\textlangle l, l\textrangle} , where every participant commits and decrements n; eventually, we conclude the transaction by moving to state \emph{Co!\textlangle \textrangle} .
-If a thread executes a retry, the transaction moves immediately to state Re\textlangle l, l\textrangle\xspace waits that every other participant acknowledges the retry, decrementing n, before restarting the transaction.
-The abort procedure (initiated by a throw) is analogous, apart from the fact that we have to propagate the exception e.
+If it is the one that zeros \emph{n}, the transaction is ready to commit: its state changes to \emph{Co\textlangle l, l\textrangle} , where every participant commits and decrements \emph{n}; eventually, we conclude the transaction by moving to state \emph{Co!\textlangle \textrangle} .
+If a thread executes a retry, the transaction moves immediately to state Re\textlangle l, l\textrangle\xspace and waits that every other participant acknowledges the retry, decrementing \emph{n}, before restarting the transaction.
+The abort procedure (initiated by a throw) is analogous, apart from the fact that we have to propagate the exception \emph{e}.
 The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle}  and \emph{Re!\textlangle \textrangle}  identify the states of the machine when \emph{n} = 0 and the commit, abort or retry procedures are completed.
 
 \begin{figure*}
@@ -117,15 +117,14 @@ In this automaton, each transition is labeled with a triple ``a;c;v'' where \emp
 
 \section{Validation and commit}
 
-The \emph{atomic} and \emph{isolated} functions operate by executing the computation of type \emph{TM a} encapsulated inside the monadic values of type \emph{OTM a} and \emph{ITM a}.
-The validation is the phase where the two functions differ.
+Both \emph{atomic} and \emph{isolated} functions operate by executing the computation of type \emph{TM a} encapsulated inside a monadic value of type \emph{OTM a} and \emph{ITM a}; the validation phase is where the two functions differ.
 
 In the case of an \emph{Open Transaction}, each thread checks the value returned by the executed computation and vote accordingly to change the transaction state.
 If no exceptional value is returned, the thread calls \emph{otmCommit}: this foreign function decrements the counter of running threads, and sleeps as long as the state of the transaction remain \emph{Ru\textlangle \_,\_\textrangle}.
 When the state changes, it means that the transaction have agreed on one of the states \emph{Co\textlangle n, l\textrangle}, \emph{Re\textlangle n, l\textrangle} or \emph{Ab\textlangle n, l\textrangle}.
 If the new state is \emph{Co\textlangle n, l\textrangle}, the transaction writes the Haskell value contained in the \emph{OTVarDelta} in the \emph{current value} of the \emph{OTVar}; otherwise the transactional record is discarded, the threads disjointed, and the transaction re-executed.
 
-If an exceptional value of type \emph{RetryException} is returned to the thread, then it calls \emph{otmRetry} to move the transaction in the state \emph{Re\textlangle l,l\textrangle}, in the case of other exceptions are caught, otmAbort is called, and the exception is propagated outside the transaction. If a transaction aborts or retries, all the threads retry the execution with a fresh transactional log, except the one that generated the exception.
+If an exceptional value of type \emph{RetryException} is returned to the thread, then it calls \emph{otmRetry} to move the transaction in the state \emph{Re\textlangle l,l\textrangle}, otherwise if other exceptions are caught, otmAbort is called, and the exception is propagated outside the transaction. If a transaction aborts or retries, all the threads retry the execution with a fresh transactional log, except the one that generated the exception.
 
 To summarize, the validation phase of an \emph{Open Transaction} is an agreement phase between the participating threads.
 
@@ -148,6 +147,6 @@ Each transactional record has a \emph{forward transaction} field that stores the
 We followed the implementation proposed by \citet{Anderson94wait-freeparallel} where operations on the data structure are lock free.
 Adapting their implementation to our needs, introduced the lock of the root nodes involved in the \emph{union} procedure, but \emph{find} operations are still lock free.
 
-After \emph{otmUnion} has acquired the locks on the transactional records that have to be merge, union by rank is performed, and the number of running and participating threads of one transaction is added to those of the new root transaction.
+After \emph{otmUnion} has acquired the locks on the transactional records that have to be merged, union by rank is performed, and the number of running and participating threads of one transaction is added to that of the new root transaction. The transactional log that is no longer representing a transaction, becomes a mere node of the Union-Find with the unique scope of referencing the root of the set.
 
 \fakesection{Blocking on retry}

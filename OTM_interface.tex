@@ -6,6 +6,45 @@ Haskell was chosen as the development language because of its very expressive ty
 In \cite{Harris:2005:CMT:1065944.1065952} this has been used to single out computations which may be used in transactions, from those which can perform irreversible I/O effects. 
 In the implementation, this idea is further improved by using the type system to separate \emph{isolated} transactions from those who can interact, and hence be merged.
 
+\begin{figure}
+    \centering
+    \begin{Verbatim}[tabsize=3, gobble=2]
+        data ITM a
+        data OTM a
+        -- henceforth, t is a placeholder for ITM or OTM --
+        
+        -- Sequencing, do notation ------------------------
+        (>>=)  :: t a -> (a -> t b) -> t b
+        return :: a -> t a
+        
+        -- Running isolated and atomic computations -------
+        atomic   :: OTM a -> IO a
+        isolated :: ITM a -> OTM a
+        
+        -- Composing transactions -------------------------
+        class (Monad m) => MonadTransaction m where
+            retry    :: m a
+            orElse   :: m a -> m a -> m a
+        
+        -- Exceptions -------------------------------------
+        throw :: Exception e => e -> t a
+        catch :: Exception e => t a -> (e -> t a) -> t a
+        
+        -- Threading --------------------------------------
+        fork :: OTM () -> OTM ThreadId
+        
+        -- Transactional memory ---------------------------
+        data OTVar a
+        class (Monad m) => MonadTM m where
+            newOTVar     :: a -> m (OTVar a)
+            readOTVar    :: OTVar a -> m a
+            writeOTVar   :: OTVar a -> a -> m ()
+
+    \end{Verbatim}
+    \caption{The base interface of OTM.}
+    \label{fig:base-interface}
+\end{figure}
+
 \section{Transactional actions and variables}
 The key idea introduced by \citet{OpenTransactionsSpec} is to separate isolation from atomicity: isolation is a computational aspect that can be added to atomic transactions.
 Following this perspective, at the type system level we distinguish isolated atomic actions, represented as values of type \emph{ITM a}, and non isolated atomic actions, as values of type \emph{OTM a}. Actions can be sequentially composed with the corresponding bind operator preserving atomicity and, for ITM actions, isolation.
@@ -117,44 +156,34 @@ This can be achieved straightforwardly using \emph{OTM}:\\
 Both functions deliver atomic actions that synchronize using
 \textcode{c1} and \textcode{c2}. 
 
-\begin{figure}
-    \centering
-    \begin{Verbatim}[tabsize=3, gobble=2]
-        data ITM a
-        data OTM a
-        -- henceforth, t is a placeholder for ITM or OTM --
-        
-        -- Sequencing, do notation ------------------------
-        (>>=)  :: t a -> (a -> t b) -> t b
-        return :: a -> t a
-        
-        -- Running isolated and atomic computations -------
-        atomic   :: OTM a -> IO a
-        isolated :: ITM a -> OTM a
-        
-        -- Composing transactions -------------------------
-        class (Monad m) => MonadTransaction m where
-            retry    :: m a
-            orElse   :: m a -> m a -> m a
-        
-        -- Exceptions -------------------------------------
-        throw :: Exception e => e -> t a
-        catch :: Exception e => t a -> (e -> t a) -> t a
-        
-        -- Threading --------------------------------------
-        fork :: OTM () -> OTM ThreadId
-        
-        -- Transactional memory ---------------------------
-        data OTVar a
-        class (Monad m) => MonadTM m where
-            newOTVar     :: a -> m (OTVar a)
-            readOTVar    :: OTVar a -> m a
-            writeOTVar   :: OTVar a -> a -> m ()
+\section{Concurrency}
 
-    \end{Verbatim}
-    \caption{The base interface of OTM.}
-    \label{fig:base-interface}
-\end{figure}
+Differently from \emph{STM}, \emph{OTM} supports parallelism inside non-isolated transactions.
+We can easily fork new threads without leaving \emph{OTM} but, like any effect of a transactional action, thread creation and execution remain tentative until the whole transaction commits. 
+Forked threads participate to their transaction and impact its life-cycle (e.g.~issuing aborts) as any other participant.
+This means that before committing, all forked threads have to complete their transactional action, i.e.~terminate.
+Therefore, although the whole effect delivered by the transaction has happened concurrently, forked threads  never leave a transaction alive.
+
+% Because of their transactional nature, threads forked inside
+% a transaction do not have compensations nor continuations 
+% (i.e.~I/O actions to be executed after an abort or after a commit).
+% Compensations are pointless since aborts revert all effects including 
+% thread creation. It is indeed possible to replace the primitive 
+% \textcode{fork} with one supporting I/O actions as continuations like
+% \begin{Verbatim}[tabsize=3, xleftmargin=1ex, gobble=1]
+%     forkCont :: OTM a -> (a -> IO ()) -> OTM ThreadID
+% \end{Verbatim}
+% In fact, this mechanism can be implemented with the primitives
+% already offered \emph{OTM}:  since commits are synchronisation points,
+% the above corresponds to the parent thread
+% forking a thread for each continuation, after the atomic action is
+% successfully completed.
+
+On the other hand, by definition isolated atomic actions have to appear 
+as being executed in a single-threaded setting; hence neither 
+\emph{STM} nor \emph{ITM} actions support thread creation.
+
+
 
 \section{Examples}
 \paragraph{Crowdfunding}
@@ -351,7 +380,7 @@ that will be produced by the worker threads.
     \label{fig:example-futures}
 \end{figure}
 
-A future can be implemented in \emph{OTM} by a TVar
+A future can be implemented in \emph{OTM} by a OTVar
 holding a value of type \emph{Maybe a}: either it is
 ``not-ready-yet'' (\textcode{Nothing}) or it holds something 
 of type \emph{a}.
