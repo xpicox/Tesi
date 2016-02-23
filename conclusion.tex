@@ -1,0 +1,12 @@
+%!TEX root = thesis.tex
+
+\chapter{Conclusions}
+
+We obtained to get isolated transactions inside atomic transactions.
+We successfully built a framework independent from STM that maintain the same interface: against both the user of the library and the Haskell Runtime System.
+From the implementation of \citet{Toneguzzo} we moved all the data structures at the same level of those of STM.
+Future work:
+Part of the functionalities must be implemented such us nested transactions on both ITM and OTM.
+Integrate OTM in the Haskell runtime as a conservative extension of STM, that implements a mechanism for thread safe communication between transactions.
+
+The fact that we are not at the runtime level, does not favor our implementation over STM one, but the \emph{Open Transactions} formalism is more expressive and we hope that the overhead introduced by OTM is acceptable for the users.
