@@ -12,7 +12,19 @@ Finally the OTM interface is exposed by the the Haskell module Control.Monad.OTM
 
 The \emph{TM Monad} is the hearth of our transactional memory implementation;
 the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
-% monadic actions of type \emph{TM a} represent transactions that when performed will return a value of type \emph{a}.
+
+\begin{figure}
+\begin{Verbatim}
+type TM = StateT OTRec (ExceptT RetryException IO)
+
+newtype OTM a = OTM { unOTM :: TM a }
+    deriving (Functor, Applicative, Monad)
+
+newtype ITM a = ITM { unITM :: TM a }
+    deriving (Functor, Applicative, Monad)
+\end{Verbatim}
+\caption{Monads of the OTM library}
+\end{figure}
 
 The \emph{TM Monad} is a type synonym for a stack of monad transformers that solve the following constraints:
 reads and writes are foreign functions with side effects, thus the IO monad is the innermost;
@@ -20,7 +32,33 @@ transactions may explicitly fail, \ie, call \emph{retry}, thus the \emph{ExceptT
 furthermore transactions need to keep track of their state, reads and tentative writes, thus the \emph{StateT} monad transformer adds a transactional log as the state of the computation.
 
 \section{Transactional record and OTVars}
+\begin{figure}
+\begin{Verbatim}
+-- Transactional record for Haskell code
+newtype OTRec = OTRec (ForeignPtr OTRec)
 
+-- Transactional variable for Haskell code
+newtype OTVar a = OTVar (ForeignPtr (OTVar a))
+
+-- Transactional record for C code
+struct OTRecHeader_ {
+    struct OTRecHeader_         *enclosing_trec;        // Used by nested transactions
+    OTRecNode                   *volatile forward_trec; // Union-Find information
+    OTRecChunk                  *current_chunk;         // Array of OTRecEntries
+    OTRecState                   volatile state;        // State of the transaction
+    Cond                         condition_variable;    // Used by retry mechanism
+};
+
+-- Transactional variable for C code
+typedef struct {
+    OtmStablePtr        volatile current_value;            // Current value reference counted
+    OTVarWatchQueue    *volatile first_watch_queue_entry;  // Wait queue
+    HsWord              volatile locked;                   // 0 means not locked
+    OTVarDelta         *volatile delta;                    // Shared memory
+} OTVar;
+\end{Verbatim}
+\caption{Data structures}
+\end{figure}
 The transactional record (\emph{OTRec}) contains an entry for each \emph{OTVar} that the transaction has accessed.
 Each entry in the transactional log is an \emph{OTRecEntry} that contains a reference to the \emph{OTVar} involved and two additional fields used only by \emph{Isolated Transaction}.
 This additional fields, that contain the \emph{old value} held in the \emph{OTVar} when it was first accessed and the \emph{new value} to be committed if the validation succeeds, represent the working memory of an isolated transaction.
@@ -34,6 +72,8 @@ The same stable pointer could be copied in the working memory of several transac
 The transactional record contains additional informations that describe the state of the transaction, \ie, in which phase of the life cycle it is, the number of total threads participating to this transaction and the number of threads that are still running.
 
 The \emph{OTRec} and the \emph{OTVar} are allocated by the foreign code, but wrapped inside a \emph{Foreign Pointer} so their life span is managed by the garbage collector.
+
+
 
 \section{Transaction life-cycle}
 
