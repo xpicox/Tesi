@@ -221,17 +221,98 @@ If the validation succeeds, the writes in the log are made visible to other thre
 \section{Merge of transactions}
 
 Transaction merging is triggered by operations on the shared memory.
-This operations are read and writes of \emph{OTVar}s in the OTM monad, and commits of isolated transactions.
+This operations are reads and writes of \emph{OTVar}s in the OTM monad, and commits of isolated transactions.
+
+\begin{figure}
+\begin{Verbatim}
+-- Haskell declaration
+otmReadOTVar :: OTRec -> OTVar a -> IO (StablePtr a)
+
+-- C implementation
+\end{Verbatim}
+\begin{lstlisting}[language=C]
+HsStablePtr otmReadOTVar(OTRecHeader* trec, OTVar* otvar) {
+    TRACE("trec: %p read  %p", trec, otvar);
+    assert(trec -> forward_trec != NULL);
+
+    if(!otm_acquire_OTVar_read(trec, otvar)) {
+        if(!otmUnion(trec, otvar -> delta -> trec)){
+            // Retry the read
+            // otvar's trec is OTREC_ABORTED || OTREC_COMMITED || OTREC_RETRYED
+            return otmReadOTVar(trec, otvar);
+        }
+    }
+    while(otvar -> locked) {    // An isolated transaction is committing
+        busy_wait_nop();
+    }
+    return otvar -> delta -> new_value -> ptr;
+}
+\end{lstlisting}
+\caption{Open read of an OTVar}
+\label{fig:otmread}
+\end{figure}
 
 The first time an \emph{OTVar} is accessed, it is \emph{acquired} by the transaction that requested the operation: its \emph{delta memory}, initially empty, is filled in with an \emph{OTVarDelta} containing the \emph{shared value} and a reference to the transaction which is acquiring the variable.
-The acquiring phase is implemented with a \emph{compare\&swap}: if it fails then the \emph{OTVar} is already been acquired by another transaction.
+As shown in \cref{fig:otmread} line 5, the \emph{acquiring phase} is the first phase of a read or a write in the OTM monad.
+This phase is a tentative update of the \emph{delta memory} of an \emph{OTVar} carried out atomically by means a \emph{compare\&swap} instruction: if it fails, the \emph{OTVar}'s \emph{delta memory} was not empty, thus the variable had already been acquired by another transaction.
 
-When a transaction reads or writes an owned \emph{OTVar}, the function \emph{otmUnion} is called.
+\begin{figure}
+\begin{lstlisting}[language=C]
+HsBool otmUnion(OTRecHeader* trec1, OTRecHeader* trec2){
+    OTRecHeader *x, *y, *temp;
+    OTState x_s, y_s;
+    HsWord x_rank, y_rank, t_rank;
+    HsBool result;
+    do {
+        // Find the roots of the Union-Find
+        x = find(trec1);
+        y = find(trec2);
+        if (x == y) {
+            return TRUE;
+        }
+        if (is_greater_then(x, y)) {
+            temp = x;
+            x = y;
+            y = temp;
+        }
+        // Invariant x < y
+        x_rank = x -> forward_trec -> rank;
+        y_rank = y -> forward_trec -> rank;
+        x_s = lock_OTRec(x);
+        y_s = lock_OTRec(y);
+        if (!((x_s & y_s) & OTREC_RUNNING)) {
+            // If both transaction are not running
+            unlock_OTRec(y, y_s);
+            unlock_OTRec(x, x_s);
+            return FALSE;
+        }
+        result = update_root(x, x_rank, y, y_rank);
+        if (result) {
+            if (x_rank == y_rank) {
+                update_root(y, y_rank, y, y_rank +1);
+            }
+            // Fix (long) equal ranked chains
+            setRoot(x);
+            y -> state.running += x -> state.running;
+            y -> state.threads += x -> state.threads;
+        }
+        unlock_OTRec(y, y_s);
+        unlock_OTRec(x, x_s);
+    } while (!result);
+    return TRUE;
+}
+\end{lstlisting}
+\caption{Merge of transactions}
+\label{fig:otmunion}
+\end{figure}
+
+When a transaction reads or writes an owned \emph{OTVar}, the function \emph{otmUnion} is called (\cref{fig:otmread} line 6).
 To represent transaction merges we opted for a Union-Find data structure with the heuristics of \emph{path compression} and \emph{union by rank}.
 Each transactional record has a \emph{forward transaction} field that stores the information needed by the data structure: the \emph{rank} of that node and a reference to the \emph{root} of the set.
 We followed the implementation proposed by \citet{Anderson94wait-freeparallel} where operations on the data structure are lock free.
 Adapting their implementation to our needs, introduced the lock of the root nodes involved in the \emph{union} procedure, but \emph{find} operations are still lock free.
 
-After \emph{otmUnion} has acquired the locks on the transactional records that have to be merged, union by rank is performed, and the number of running and participating threads of one transaction is added to that of the new root transaction. The transactional log that is no longer representing a transaction, becomes a mere node of the Union-Find with the unique scope of referencing the root of the set.
+The \emph{otmUnion} function is shown in \cref{fig:otmunion}. It acquires the locks on the transactional records that have to be merged and performs a union by rank. If the union succeeds, the number of running and participating threads of one transaction is added to that of the new root transaction. The transactional log that is no longer representing a transaction, becomes a mere node of the Union-Find with the unique scope of referencing the root of the set. Attempting to merge transactions that are not in the \emph{Ru\textlangle n, l\textrangle} state, causes the union process failure (lines 23-28).
 
+For the read operation in \cref{fig:otmread}, the success of the \emph{otmUnion} function allows the conclusion of the operation.
 \fakesection{Blocking on retry}
