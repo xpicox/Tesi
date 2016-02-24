@@ -314,5 +314,4 @@ Adapting their implementation to our needs, introduced the lock of the root node
 
 The \emph{otmUnion} function is shown in \cref{fig:otmunion}. It acquires the locks on the transactional records that have to be merged and performs a union by rank. If the union succeeds, the number of running and participating threads of one transaction is added to that of the new root transaction. The transactional log that is no longer representing a transaction, becomes a mere node of the Union-Find with the unique scope of referencing the root of the set. Attempting to merge transactions that are not in the \emph{Ru\textlangle n, l\textrangle} state, causes the union process failure (lines 23-28).
 
-For the read operation in \cref{fig:otmread}, the success of the \emph{otmUnion} function allows the conclusion of the operation.
-\fakesection{Blocking on retry}
+For the read operation in \cref{fig:otmread}, the success of the \emph{otmUnion} function allows its conclusion by returning the value held in the \emph{OTVar}'s \emph{delta memory}. Instead, a write operation ends by atomically writing the \emph{delta memory} of an OTVar.
