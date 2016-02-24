@@ -1,3 +1,11 @@
 %!TEX root = thesis.tex
 
-Facciamo tante belle cose concorrenti
+Le memorie transazionali sono emerse come promettente meccanismo per il controllo della concorrenza ad alto livello e valida alternativa alla sincronizzazione basata su lock e semafori.
+Molte implementazioni permettono esclusivamente l'utilizzo di transazioni \emph{isolate}, le quali non sono adeguate in contesti multi-threaded dove le transazioni necessitano di interagire attraverso dati condivisi \emph{prima} di fare il commit.
+In questa tesi, presentiamo le memorie transazionali aperte, \emph{Open Memory Transactions} (OTM), un modello di programmazione in grado di supporta interazioni \emph{sicure} fra transazioni di memoria \emph{componibili}. 
+In questo modello, transazioni diverse, appena accedono a variabili condivise, vengono fuse a runtime in maniera \emph{trasparente} al programmatore; i thread associati a queste transazioni possono così cooperare fino a che tutti fanno commit oppure abort.
+Quindi, questo modello rilassa il requisito di isolamento, comunque garantendo l'atomicità; inoltre, permette interazioni debolemnete accopiate dato che la fusione delle transazione è dinamica e dettata unicamente dall'accesso a dati condivisi, senza il bisogno di specificare i partecipanti in anticipo.
+
+Presentiamo OTM nel constesto del linguaggio Haskell, sfruttando il suo type system per garantire la componibilità delle transazioni.
+Dopo aver definito l'interfaccia per il programmatore (\ie, i tipi di dato, le strutture dati e i costruttori), presentiamo alcuni esempi come le barriere e le reti di Petri; inoltre, mostriamo che OTM è un estensione conservativa di STM.
+Infine, presentiamo un'implementazione di OTM in Haskell che proponiamo come alternativa ad STM.

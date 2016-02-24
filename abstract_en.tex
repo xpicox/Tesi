@@ -1,3 +1,11 @@
 %!TEX root = thesis.tex
 
-We do a lot of pretty concurrent things
+Transactional memory (TM) has emerged as a promising high-level concurrency control mechanism alternative to fine grained lock-based synchronization.
+However, most TM models admit only \emph{isolated} transactions, which are not adequate in multi-threaded programming where transactions have to interact via shared data \emph{before} committing.
+In this thesis, we present \emph{Open Transactional Memory} (OTM), a programming model supporting \emph{safe, data-driven} interactions between \emph{composable} memory transactions.
+In this model, different transactions are transparently \emph{merged} at runtime as soon as they access to shared variables; their threads can then cooperate, until they all either commit or abort together.
+Thus, this model relaxes the isolation requirement still guaranteeing atomicity; moreover, it allows for \emph{loosely-coupled} interactions since transaction merging is dynamic and driven only by accesses to shared data, with no need to specify participants beforehand.
+
+We present OTM in the setting of the Haskell language, taking advantage of its type system for guaranteeing composability.  
+After having defined the programmer's interface (i.e., types, data structures and constructs), we give some examples such as barriers and Petri nets; moreover, we show that OTM is a conservative extension of STM.
+Finally, we present an implementation of OTM in Haskell, as an alternative of STM.
