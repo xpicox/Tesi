@@ -24,7 +24,7 @@ A type to be defined a \emph{monad} must have the following components:
 \todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
 As shown in \cref{}, a value of type \emph{IO a} is a monadic action implemented as a function which takes as its input a value representing the entire current state of the world and returns a pair consisting of a value representing the new state of the world, and the result of type \emph{a}.
 This introduces \emph{data dependencies} between monadic actions, because each action depends on the \emph{RealWord} value computed by the previous one, hence, preventing the compiler from reordering actions, \emph{sequencing} is introduced for I/O operations.
-Besides I/O operations, values of IO include operations with side effects on mutable data types, \eg, a mutable variable ha type \emph{IORef a} and may be accessed only via the following operations:
+Besides I/O operations, values of IO include operations with side effects on mutable data types, \eg, a mutable variable has type \emph{IORef a} and may be accessed only via the following operations:
 
 \begin{lstlisting}
 newIORef   :: a -> IO (IORef a)

@@ -9,10 +9,6 @@ All the foreign declarations reside in the file Internals.chs and are written wi
 Finally the OTM interface is exposed by the the Haskell module Control.Monad.OTM and defined in the file OTM.hs.
 
 \section{Monads TM, OTM and ITM}
-
-The \emph{TM Monad} is the hearth of our transactional memory implementation;
-the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
-
 \begin{figure}
 \begin{Verbatim}
 type TM = StateT OTRec (ExceptT RetryException IO)
@@ -22,10 +18,18 @@ newtype OTM a = OTM { unOTM :: TM a }
 
 newtype ITM a = ITM { unITM :: TM a }
     deriving (Functor, Applicative, Monad)
+
+evalOTM :: OTM a -> OTRec -> IO (Either RetryException a)
+evalOTM otm s = runExceptT . flip evalStateT s $ unOTM otm
+
+evalITM :: ITM a -> OTRec -> IO (Either RetryException a)
+evalITM itm s = runExceptT . flip evalStateT s $ unITM itm
 \end{Verbatim}
 \caption{Monads of the OTM library}
+\label{fig:monads}
 \end{figure}
-
+The \emph{TM Monad} is the hearth of our transactional memory implementation;
+the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
 The \emph{TM Monad} is a type synonym for a stack of monad transformers that solve the following constraints:
 reads and writes are foreign functions with side effects, thus the IO monad is the innermost;
 transactions may explicitly fail, \ie, call \emph{retry}, thus the \emph{ExceptT} monad transformer allows computations to terminate with an exceptional value,
@@ -79,13 +83,11 @@ The \emph{OTRec} and the \emph{OTVar} are allocated by the foreign code, but wra
 
 The life-cycle of an \emph{Open Transaction} is quite complex compared to that of an \emph{Isolated Transactions}, for which can also be ignored.
 
-%In this automaton, each transition is labelled with a triple “a;;v” where a is the action (possibly with parameters), c is a condition under which the action can be taken, and ⃗v is the list of new values to put in the target state registers.
-
 The state of a running transaction is \emph{Ru\textlangle n, l\textrangle}, where \emph{n} is the number of threads that have not already voted to commit, and \emph{l} is the total number of threads participating to the transaction.
 This is the only state where new threads can be merged to the transaction. When a transaction is created, its state is \emph{Ru\textlangle 1, 1\textrangle}.
 When another transaction is merged, we add the registers componentwise; when a thread returns and hence is ready to commit, \emph{n} is decremented.
 If it is the one that zeros \emph{n}, the transaction is ready to commit: its state changes to \emph{Co\textlangle l, l\textrangle} , where every participant commits and decrements \emph{n}; eventually, we conclude the transaction by moving to state \emph{Co!\textlangle \textrangle} .
-If a thread executes a retry, the transaction moves immediately to state Re\textlangle l, l\textrangle\xspace and waits that every other participant acknowledges the retry, decrementing \emph{n}, before restarting the transaction.
+If a thread executes a retry, the transaction moves immediately to state \emph{Re\textlangle l, l\textrangle} and waits that every other participant acknowledges the retry, decrementing \emph{n}, before restarting the transaction.
 The abort procedure (initiated by a throw) is analogous, apart from the fact that we have to propagate the exception \emph{e}.
 The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle}  and \emph{Re!\textlangle \textrangle}  identify the states of the machine when \emph{n} = 0 and the commit, abort or retry procedures are completed.
 
@@ -157,9 +159,41 @@ In this automaton, each transition is labeled with a triple ``a;c;v'' where \emp
 
 \section{Validation and commit}
 
-Both \emph{atomic} and \emph{isolated} functions operate by executing the computation of type \emph{TM a} encapsulated inside a monadic value of type \emph{OTM a} and \emph{ITM a}; the validation phase is where the two functions differ.
+Both \emph{atomic} and \emph{isolated} functions operate by executing the computation of type \emph{TM a} encapsulated inside a monadic value of type \emph{OTM a} and \emph{ITM a} by means the functions declared in \cref{fig:monads}; the validation phase is where the two functions differ.
 
-In the case of an \emph{Open Transaction}, each thread checks the value returned by the executed computation and vote accordingly to change the transaction state.
+\begin{figure}
+\begin{Verbatim}
+atomic:: forall a . OTM a -> IO a
+atomic otm = do
+    otrec <- startOpenTransaction
+    result <- try $ evalOTM otm otrec :: IO (Either SomeException (Either RetryException a))
+    case result of
+        Left se -> do
+            exp <- newStablePtr se
+            state <- otmAbort otrec exp
+            otmHandleTransaction otrec otm state
+        Right computation ->  case computation of
+            Left _ -> do
+                state <- otmRetry otrec
+                otmHandleTransaction otrec otm state
+            Right v -> do
+                state <- otmCommit otrec
+                case state of
+                    OtrecCommited -> return v
+                    _ -> otmHandleTransaction otrec otm state
+\end{Verbatim}
+\caption{\emph{atomic} implementation}
+\end{figure}
+\begin{figure}
+\begin{Verbatim}
+otmCommit :: OTRec -> IO OTState
+otmRetry  :: OTRec -> IO OTState
+otmAbort  :: OTRec -> StablePtr SomeException -> IO OTState
+\end{Verbatim}
+\caption{Agreement interface}
+\end{figure}
+
+In the case of an \emph{Open Transaction}, each thread checks the value returned by the executed computation and vote accordingly to change the transaction state. 
 If no exceptional value is returned, the thread calls \emph{otmCommit}: this foreign function decrements the counter of running threads, and sleeps as long as the state of the transaction remain \emph{Ru\textlangle \_,\_\textrangle}.
 When the state changes, it means that the transaction have agreed on one of the states \emph{Co\textlangle n, l\textrangle}, \emph{Re\textlangle n, l\textrangle} or \emph{Ab\textlangle n, l\textrangle}.
 If the new state is \emph{Co\textlangle n, l\textrangle}, the transaction writes the Haskell value contained in the \emph{OTVarDelta} in the \emph{current value} of the \emph{OTVar}; otherwise the transactional record is discarded, the threads disjointed, and the transaction re-executed.
