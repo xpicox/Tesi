@@ -2,13 +2,19 @@
 
 \chapter{Conclusions}
 
-We obtained to get isolated transactions inside atomic transactions.
-We successfully built a framework independent from STM that maintain the same interface: against both the user of the library and the Haskell Runtime System.
-From the implementation of \citet{Toneguzzo} we moved all the data structures at the same level of those of STM.
-Our implementation showed that OTM can be easily added to STM: the two implementations uses the same logical components. Transactional records, entries of the transactional record and mutable transactional variables differ minimally from those in STM.
+We have presented OTM, a programming model supporting  interactions between composable memory transactions.
+This model separates isolated transactions from non-isolated ones, still guaranteeing atomicity; non-isolated transactions can interact by accessing to shared variables.
+Consistency is ensured by transparently \emph{merge} interacting transactions at runtime.  
+We have showed the versatility and simplicity of OTM by implementing several fundamental communication idioms (such as producer-consumer, futures, barriers, etc.) and some examples which are incompatible with isolation.
+Then, we have provided an Haskell implementation of OTM as a library independent from \emph{STM}, that maintain the same interface against both the user of the library and the Haskell Runtime System; in fact, \emph{OTM} is a conservative extension of \emph{STM}.
 
-Future work:
-Part of the functionalities must be implemented such us nested transactions on both ITM and OTM.
-Integrate OTM in the Haskell runtime as a conservative extension of STM, that implements a mechanism for thread safe communication between transactions.
+A first direction for future work concerns the implementation.
+One possibility is to add some heuristics to better handle \emph{retry} events.
+Currently, a \emph{retry} restarts all threads participating to the transaction; a more efficient implementation would keep track of the \emph{working set} of each thread, and at a \emph{retry} we need to restart only those threads whose working sets have non-empty intersection with that being restarted.
+A solution has already been found and the data structures are designed to support such behavior, but the implementation is lacking.
+Furthermore, nested transaction must be added to both isolated and non isolated execution environments.
+Nested isolated transaction can be easily integrated in ITM because the data structures do not need further modification; much more work would be required to implement nested open transactions.
 
-The fact that we are not at the runtime level, does not favor our implementation over STM one, but the \emph{Open Transactions} formalism is more expressive and we hope that the overhead introduced by OTM is acceptable for the users.
+From the implementation of \citet{Toneguzzo} we moved a little closer to the Haskell RTS, but further optimizations can be achieved by implementing transactions and OTVars directly in the runtime, along the lines of the implementation of \emph{STM} in the Glasgow Haskell Compiler.
+
+We have presented OTM within Haskell (especially to leverage its type system), but this model is general and can be applied to other STM implementations. A possible future work is to port this model to an imperative object oriented language, such as Java or C++; like other TM implementations, we expect that this extension will require some changes in the compiler and/or the runtime. 
