@@ -13,7 +13,46 @@ At the highest level GHC can be divided into two parts:
  \item The compiler itself. This is an Haskell program whose job is to convert Haskell source code into executable machine code.
  \item The Runtime System (RTS). This is a large library of C code that handles all the tasks associated with running the compiled Haskell code, including garbage collection, thread scheduling, profiling, exception handling. The RTS is linked into every compiled Haskell program.
  \end{itemize}
-The compilation route of a source file involves several phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, translating Haskell syntax into a much smaller language called \emph{Core}. The next phase is the optimization one: there are about six passes of optimization each of which takes \emph{Core} and produces \emph{Core}; in this phase, optimizations like dead code elimination, constants propagation or function inlining are applied to the program. Once the \emph{Core} program has been optimized, the process of code generation begins. The code generator first converts the \emph{Core} into a language called \emph{STG}, which is essentially just \emph{Core} annotated with more information required by the code generator. Then, \emph{STG} is translated to \emph{Cmm}, a low-level imperative language with an explicit stack. Finally, the \emph{Cmm} is converted to LLVM code (IR) and passed to the LLVM compiler that produces the native code.
+The compilation route of a source file involves several phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, translating Haskell syntax into a much smaller language called \emph{Core}. The next phase is the optimization one: there are about six passes of optimization each of which takes \emph{Core} and produces \emph{Core}; in this phase, optimizations like dead code elimination, constants propagation or function inlining are applied to the program. Once the \emph{Core} program has been optimized, the process of code generation begins. The code generator first converts the \emph{Core} into a language called \emph{STG}, which is essentially just \emph{Core} annotated with more information required by the code generator. Then, \emph{STG} is translated to \emph{Cmm}, a low-level imperative language with an explicit stack. Finally, the \emph{Cmm} is converted to LLVM code (IR) and passed to the LLVM compiler that produces the native code.\todo{Menzionare la figura della pipeline}
+
+\begin{figure}
+\begin{center}
+\begin{tikzpicture}[
+    auto,>=stealth,
+    box/.style={
+      draw,
+      rectangle,
+      inner sep=3pt,outer sep=2pt
+    },
+    arr/.style={
+      double,
+      -implies,
+    },
+    lbl/.style={
+      text width=2.5cm,
+      align=center,
+      yshift=1.5ex
+    }
+  ]
+  \def\d{1.5cm}
+  \node[box]                 (n1) {Haskell};
+  \node[box, right=\d of n1] (n2) {Core};
+  \node[box, right=\d of n2] (n3) {Core};
+  \node[box, right=\d of n3] (n4) {STG};
+  \node[box, right=\d of n4] (n5) {Cmm};
+  \node[box, right=\d of n5] (n6) {LLVM IR};
+
+  \draw[arr] (n1) to node[lbl] {Parsing\\Typechecking\\Desugaring} (n2);
+  \draw[arr] (n2) to node[lbl] {Optimization}     (n3);
+  \draw[arr] (n3) to                              (n4);
+  \draw[arr] (n4) to node[lbl] {Code\\Generation} (n5);
+  \draw[arr] (n5) to node[lbl] {Lowering}         (n6);
+\end{tikzpicture}
+\end{center}
+\caption{Structure of GHC compilation pipeline}
+\label{fig:pipeline}
+\end{figure}
+
 
 \section{The Spineless Tagless G-Machine}
 
@@ -80,11 +119,11 @@ Among the features offered by the RTS, there is also the support for GHC's Softw
 This implementation is split into two layers.
 The top layer implements the STM operations described in \ref{cc}.
 This is built on top of the lower layer, which comprises a C library for performing memory transactions that is integrated in the Haskell runtime system.
-The lower layer functionalities are made available to Haskell code through the \emphidx{Primitive Operations} (PrimOps), \ie functions that, in the case of STM, are implemented by handwritten Cmm code. 
+The lower layer functionalities are made available to Haskell code through the \emphidx{Primitive Operations} (PrimOps), \ie functions that, in the case of STM, are implemented by handwritten Cmm code.
 As will be shown, STM takes full advantage from the explicit stack management offered by the Cmm language.
 
 \subsection{STM implementation}
-While executing a memory transaction, a thread-local \emph{transaction log} is built up recording the reads and tentative writes that the transaction has performed. 
+While executing a memory transaction, a thread-local \emph{transaction log} is built up recording the reads and tentative writes that the transaction has performed.
 This transaction log, in the implementation referred to as \emph{transactional record}, is held in a heap allocated object called a \emphidx{TRec} that is pointed to by the TSO of the thread engaged in the transaction.
 
 The log contains an entry for each of the TVars that the memory transaction has accessed.
@@ -109,7 +148,7 @@ The \emph{retry} PrimOp unwinds the stack in search of an STM's frame and depend
 \item
 In the case of an \emph{AtomicallyFrame}, stmWait is called.
 The validation procedure is performed\todo{se è un sinonimo è meglio, parola già usata nella frase a inizio paragrafo} to check that the transaction log has seen a consistent view of the heap, and if not the transaction is re-run.
-In the consistent case, it allocates new \emph{wait-queue entries}, held in  lists attached to the TVars that the transaction has read. 
+In the consistent case, it allocates new \emph{wait-queue entries}, held in  lists attached to the TVars that the transaction has read.
 Once this is done, the calling thread is responsible for blocking itself and reentering the scheduler. The wait queue entries are noticed by a commit which updates the TVars: the updater unblocks any waiters it encounters.
 \item
 If the frame is a \emph{CatchRetryFrame} and the \emph{retry} is called by the first transaction of the \emph{orElse} then the TRec is discarded and the second transaction is started. If also the second transaction calls a \emph{retry}, the \emph{retry} is propagated further.

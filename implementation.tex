@@ -8,9 +8,9 @@ Since the FFI does not provide a type safe marshaling for pointers, we decided t
 All the foreign declarations reside in the file Internals.chs and are written with the syntax of C2HS.\cite{Chakravarty2000}
 Finally the OTM interface shown in \cref{fig:base-interface} is exposed by the the Haskell module Control.Monad.OTM and defined in the file OTM.hs.
 
-\section{Monads TM, OTM and ITM}
 \begin{figure}
-\begin{Verbatim}
+\begin{minipage}[b]{0.7\textwidth}
+    \begin{lstlisting}[language=Haskell]
 type TM = StateT OTRec (ExceptT RetryException IO)
 
 newtype OTM a = OTM { unOTM :: TM a }
@@ -24,10 +24,34 @@ evalOTM otm s = runExceptT . flip evalStateT s $ unOTM otm
 
 evalITM :: ITM a -> OTRec -> IO (Either RetryException a)
 evalITM itm s = runExceptT . flip evalStateT s $ unITM itm
-\end{Verbatim}
-\caption{Monads of the OTM library}
-\label{fig:monads}
+    \end{lstlisting}
+    \caption{Monads of the OTM library}
+    \label{fig:monads}
+\end{minipage}
+%
+\begin{minipage}[b]{0.3\textwidth}
+    \centering
+    \begin{tikzpicture}[
+            lbl/.style={
+              text width=2.9cm,
+              align=center
+            }
+        ]
+    \def\h{6.5cm}
+    \draw (0,0) rectangle (3,\h) {};
+
+    \foreach \i in {1,2,3}
+      \draw (0,{\i*\h/4}) -- +(3,0) {};
+
+    \foreach \i/\n in {0/RTS, 1/C Library, 2/FFI, 3/Haskell Interface}
+        \node[lbl] at (1.5,{\h/8 + \i*\h/4}) {\n};
+
+    \end{tikzpicture}
+    \caption{Library overview}
+\end{minipage}
 \end{figure}
+
+\section{Monads TM, OTM and ITM}
 The \emph{TM Monad} is the hearth of our transactional memory implementation;
 the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
 The \emph{TM Monad} is a type synonym for a stack of monad transformers that solve the following constraints:
@@ -36,8 +60,8 @@ transactions may explicitly fail, \ie, call \emph{retry}, thus the \emph{ExceptT
 furthermore transactions need to keep track of their state, reads and tentative writes, thus the \emph{StateT} monad transformer adds a transactional log as the state of the computation.
 
 \section{Transactional record and OTVars}
-\begin{figure}
-\begin{Verbatim}
+\begin{figure}[t]
+\begin{lstlisting}
 -- Transactional record for Haskell code
 newtype OTRec = OTRec (ForeignPtr OTRec)
 
@@ -46,21 +70,21 @@ newtype OTVar a = OTVar (ForeignPtr (OTVar a))
 
 -- Transactional record for C code
 struct OTRecHeader_ {
-    struct OTRecHeader_         *enclosing_trec;        // Used by nested transactions
-    OTRecNode                   *volatile forward_trec; // Union-Find information
-    OTRecChunk                  *current_chunk;         // Array of OTRecEntries
-    OTRecState                   volatile state;        // State of the transaction
-    Cond                         condition_variable;    // Used by retry mechanism
+    struct OTRecHeader_ *enclosing_trec;        // Used by nested transactions
+    OTRecNode           *volatile forward_trec; // Union-Find information
+    OTRecChunk          *current_chunk;         // Array of OTRecEntries
+    OTRecState           volatile state;        // State of the transaction
+    Cond                 condition_variable;    // Used by retry mechanism
 };
 
 -- Transactional variable for C code
 typedef struct {
-    OtmStablePtr        volatile current_value;            // Current value reference counted
-    OTVarWatchQueue    *volatile first_watch_queue_entry;  // Wait queue
-    HsWord              volatile locked;                   // 0 means not locked
-    OTVarDelta         *volatile delta;                    // Shared memory
+    OtmStablePtr     volatile current_value;            // Current value
+    OTVarWatchQueue *volatile first_watch_queue_entry;  // Wait queue
+    HsWord           volatile locked;                   // 0 means not locked
+    OTVarDelta      *volatile delta;                    // Shared memory
 } OTVar;
-\end{Verbatim}
+\end{lstlisting}
 \caption{Data structures}
 \end{figure}
 The transactional record (\emph{OTRec}) contains an entry for each \emph{OTVar} that the transaction has accessed.
@@ -69,7 +93,7 @@ This additional fields, that contain the \emph{old value} held in the \emph{OTVa
 
 The accesses to OTVars performed by isolated transactions remain buffered within the transactional record and invisible to other threads until the transaction commit. \emph{Open Transactions}, instead, perform this accesses in a shared working memory, that we call \emph{OTVarDelta} or \emph{delta memory}, retained directly by the \emph{OTVar}.
 
-Both \emph{OTVar} and \emph{OTRecEntry}, hold pointers to Haskell values. 
+Both \emph{OTVar} and \emph{OTRecEntry}, hold pointers to Haskell values.
 As explained in \cref{ffi:stableptr}, this pointers must be \emph{Stable Pointers}: when we write a value in an \emph{OTVar}, this value is wrapped inside a \emph{StablePtr}.
 The same stable pointer could be copied in the working memory of several transactions, so reference counting is added to each pointer: when there are no more references left to a pointer, \emph{freeStablePtr} is called.
 
@@ -104,7 +128,7 @@ The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle
             lbl/.style={align=center},
             trs/.style={->,>=stealth',shorten >=1pt},
         ]
-        
+
         \coordinate (S) at (-4.8,2.8);
         \node[state] (Ru) at (-2,1.7) {Ru$\langle n, l\rangle$};
         \node[state] (Co) at (3,3.4) {Co$\langle n, l\rangle$};
@@ -116,29 +140,29 @@ The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle
 %        \coordinate (CoT) at (5.5,4.7);
 %        \coordinate (ReT) at (5.5,2.5);
 %        \coordinate (AbT) at (5.5,0.3);
-        
-        \draw[trs] (S) to node[lbl,anchor=north east,pos=.3] 
+
+        \draw[trs] (S) to node[lbl,anchor=north east,pos=.3]
             {new; $\top$; $\langle 0,1 \rangle$} (Ru.north west);
 
-        \draw[trs,loop below] (Ru) to node[lbl,below left] 
+        \draw[trs,loop below] (Ru) to node[lbl,below left]
             {merge ${\langle n', l'\rangle}$; $\top$; $\langle n + n', l + l' \rangle$} (Ru);
-        \draw[trs,loop left,] (Ru) to node[lbl,below left] 
-            {fork; $\top$; $\langle n,l+1 \rangle$} (Ru);            
-        \draw[trs,loop above] (Ru) to node[lbl,above] 
+        \draw[trs,loop left,] (Ru) to node[lbl,below left]
+            {fork; $\top$; $\langle n,l+1 \rangle$} (Ru);
+        \draw[trs,loop above] (Ru) to node[lbl,above]
             {return; $n-1>0$; $\langle n-1,l \rangle$} (Ru);
-            
-        \draw[trs] (Ru) to node[lbl,anchor=south east, pos=.95] 
+
+        \draw[trs] (Ru) to node[lbl,anchor=south east, pos=.95]
             {return; $n-1=0$; $\langle l,l \rangle$} (Co.west);
         \draw[trs] (Ru) to node[lbl,anchor=south east, pos=.95]
             {retry; $\top$; $\langle l,l \rangle$} (Re.west);
         \draw[trs] (Ru) to node[lbl,anchor=north east, pos=.95]
             {throw $e$; $\top$; $\langle l, l, e \rangle$} (Ab.west);
 
-        \draw[trs,loop above] (Co) to node[lbl,above] 
+        \draw[trs,loop above] (Co) to node[lbl,above]
             {commit; $n-1>0$; $\langle n-1,l \rangle$} (Co);
-        \draw[trs,loop above] (Re) to node[lbl,above] 
+        \draw[trs,loop above] (Re) to node[lbl,above]
             {restart; $n-1>0$; $\langle n-1,l \rangle$} (Re);
-        \draw[trs,loop above] (Ab) to node[lbl,above] 
+        \draw[trs,loop above] (Ab) to node[lbl,above]
             {abort; $n-1>0$; $\langle n-1, l, e \rangle$} (Ab);
 
         \draw[trs] (Co) to node[lbl,above]
@@ -162,11 +186,11 @@ In this automaton, each transition is labeled with a triple ``a;c;v'' where \emp
 Both \emph{atomic} and \emph{isolated} functions operate by executing the computation of type \emph{TM a} encapsulated inside a monadic value of type \emph{OTM a} and \emph{ITM a} by means the functions declared in \cref{fig:monads}; the validation phase is where the two functions differ.
 
 \begin{figure}
-\begin{Verbatim}
+\begin{lstlisting}[language=Haskell,showlines=false]
 otmCommit :: OTRec -> IO OTState
 otmRetry  :: OTRec -> IO OTState
 otmAbort  :: OTRec -> StablePtr SomeException -> IO OTState
-\end{Verbatim}
+\end{lstlisting}
 \caption{Agreement interface}
 \label{fig:agreement}
 \end{figure}
