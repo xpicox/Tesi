@@ -5,6 +5,25 @@
 \usepackage{tikz,graphicx,placeins}
 \usetikzlibrary{calc,arrows,positioning,intersections,decorations.pathreplacing,shapes,automata,petri,backgrounds}
 
+%%petri net
+  \tikzset{
+      place/.style={
+          circle,
+          thick,
+          draw=blue!75,
+          fill=blue!20,
+          minimum size=6mm
+      },
+      transition/.style={
+          rectangle,
+          thick,
+          fill=black,
+          minimum width=8mm,
+          inner ysep=2pt
+      }
+  }
+%%
+
 \title{Open Memory Transactions}
 
 \author{Valentino Picotti}

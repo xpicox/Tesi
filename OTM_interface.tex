@@ -404,7 +404,9 @@ These semaphore operations must be
 performed atomically but not in isolation; in fact, 
 isolation would prevent transitions sharing a place to
 fire concurrently. 
-Using \emph{OTM}, all this is achieved in few lines:
+Using \emph{OTM}, all this is achieved in few lines as shown in \cref{fig:petrinets}.\newpage
+
+\begin{figure}
 \begin{Verbatim}[tabsize=3, xleftmargin=1ex, gobble=1]
     type Place = Semaphore
     
@@ -415,12 +417,15 @@ Using \emph{OTM}, all this is achieved in few lines:
                 mapM_ (isolated . down) inputs
                 mapM_ (isolated . up)   outputs
 \end{Verbatim}
-%$
+\caption{Petri nets}
+\label{fig:petrinets}
+\end{figure}
+
 Note that, since firing is atomic but not isolated,
 the above is an implementation of \emph{true concurrent} Petri nets, which is usually more difficult to achieve than interleaving semantics.
 
 For instance, consider the Petri net below:
-\\
+\\\\
 \noindent
 \begin{BVerbatim}[tabsize=3, xleftmargin=1ex, gobble=2]
         main = do
