@@ -125,28 +125,28 @@ The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle
         \draw[trs,loop left,] (Ru) to node[lbl,below left] 
             {fork; $\top$; $\langle n,l+1 \rangle$} (Ru);            
         \draw[trs,loop above] (Ru) to node[lbl,above] 
-            {return; $n+1<l$; $\langle n+1,l \rangle$} (Ru);
+            {return; $n-1>0$; $\langle n-1,l \rangle$} (Ru);
             
         \draw[trs] (Ru) to node[lbl,anchor=south east, pos=.95] 
-            {return; $n+1=l$; $\langle 0,l \rangle$} (Co.west);
+            {return; $n-1=0$; $\langle l,l \rangle$} (Co.west);
         \draw[trs] (Ru) to node[lbl,anchor=south east, pos=.95]
-            {retry; $\top$; $\langle 0,l \rangle$} (Re.west);
+            {retry; $\top$; $\langle l,l \rangle$} (Re.west);
         \draw[trs] (Ru) to node[lbl,anchor=north east, pos=.95]
-            {throw $e$; $\top$; $\langle 0, l, e \rangle$} (Ab.west);
+            {throw $e$; $\top$; $\langle l, l, e \rangle$} (Ab.west);
 
         \draw[trs,loop above] (Co) to node[lbl,above] 
-            {commit; $n+1<l$; $\langle n+1,l \rangle$} (Co);
+            {commit; $n-1>0$; $\langle n-1,l \rangle$} (Co);
         \draw[trs,loop above] (Re) to node[lbl,above] 
-            {restart; $n+1<l$; $\langle n+1,l \rangle$} (Re);
+            {restart; $n-1>0$; $\langle n-1,l \rangle$} (Re);
         \draw[trs,loop above] (Ab) to node[lbl,above] 
-            {abort; $n+1<l$; $\langle n+1, l, e \rangle$} (Ab);
+            {abort; $n-1>0$; $\langle n-1, l, e \rangle$} (Ab);
 
         \draw[trs] (Co) to node[lbl,above]
-            {commit; $n+1=l$; $\langle\rangle$} (CoT);
+            {commit; $n-1=0$; $\langle\rangle$} (CoT);
         \draw[trs] (Re) to node[lbl,above]
-            {restart; $n+1=l$; $\langle\rangle$} (ReT);
+            {restart; $n-1=0$; $\langle\rangle$} (ReT);
         \draw[trs] (Ab) to node[lbl,above]
-            {abort; $n+1=l$; $\langle e \rangle$} (AbT);
+            {abort; $n-1=0$; $\langle e \rangle$} (AbT);
     \end{tikzpicture}
     \caption{Transaction life-cycle.}
     \label{fig:implementation-lifecycle}
