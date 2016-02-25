@@ -1,62 +1,111 @@
-%!TEX root = thesis.tex
+% %!TEX root = thesis.tex
 
-\chapter{Introduction}
+% \chapter{Introduction}
 
-% \begin{epigraph}{Abraham Lincoln}
-% Tanto va la gatta al lardo che neanche ci compila\ldots
-% \end{epigraph}
+% The advent of multicore architectures has emphasized the crucial importance of mechanisms supporting correct and scalable multi-threaded programming.
+% In this model, threads can collaborate by interacting on data structures (such as tables, message queues, buffers, etc.) maintained in shared memory. 
 
-% \section{Lorem Ipsum}
-% \label{section1}
-% \lipsum[1-5]
+% Traditional lock-based mechanisms (like mutex constructs, semaphores, and barriers) used to regulate access to these shared data are notoriously difficult and error-prone, as they easily lead to deadlocks, race conditions and priority inversions; moreover, they are not composable and hinder parallelism, thus reducing efficiency and scalability.
+% \emph{Transactional memory} (TM) has emerged as a promising mechanism to replace locks \cite{moss:transactionalmemorybook,st:dc1997}.  The basic idea is to mark blocks of code as \emph{atomic}; then, execution of each block will appear either if it was executed instantaneously at some unique point in time, or, if aborted, as if it did not execute at all. This is obtained by means of \emph{optimistic} executions: the blocks are allowed to run concurrently, and eventually if an interference is detected a transaction is restarted and its effects are rolled back.
+% Transactions are composable and ensure absence of deadlocks and  priority inversions, automatic roll-back on exceptions, and increased concurrency.  Each transaction can be viewed in isolation as a \emph{single-threaded} computation, significantly reducing programmer's burden.
+% %
+% %Among many implementations \cite{elenco}, we mention \emph{STM Haskell} %\cite{hmpm:ppopp2005} which allows atomic blocks to be composed into %larger ones.  STM Haskell adopts an 
 
-% \section{Lorem Ipsum}
-% \label{section2}
-% \lipsum[1-5]
+% % Researchers have developed several implementations [5][13], semantics [1][24][15], and correctness criteria [10][24] for memory transactions. In particular, we prefer to work with memory transactions that satisfy a widely recognized correctness criterion called opacity [10]. 
 
-% \section{Lorem Ipsum}
-% \label{section3}
-% \lipsum[1-5]
+% % Paragraph 2: Specific problem considered in this paper
+% \section{The problem}
 
-% \section{Lorem Ipsum}
-% \label{section4}
-% \lipsum[1-5]
-
-% \section{Lorem Ipsum}
-% \label{section5}
-% \lipsum[1-5]
-
-% \section{Sit Amet}
-% As seen in \cref{section2,section1,section3,section5}, blah blah.
-% As proved by \citet{MiculanPT15}, I like 
-% \textcolor{red}{transactions} \index{transactions} are 
-% {\tiny Ciao} come va?
-% \emphidx{beautiful}.
-
-% \begin{theorem}
-% Sia un triangolo rettangolo..
-% \end{theorem}
-% \begin{proof}
-% Vai alle elementari...
-% \end{proof}
-
-% \begin{listing}
-
-% \begin{lstlisting}[language=c]
-% int main() {
-%   return 0; // ciao
+% In multi-threaded programming different transactions may need to interact and exchange data \emph{before} committing. 
+% In this situation, transaction isolation is a severe shortcoming.  A simple example is a request-response interaction via a shared buffer.  We could try to synchronize the threads accessing the buffer \emph{b} by means of two semaphores \verb|c1|, \verb|c2| as follows: 
+% \\[0.6ex]
+% \begin{BVerbatim}[baseline=t]
+% // Party1 (Master)
+% atomically {
+%   // put request in b
+%   up(c1);
+%   // some other code
+%   down(c2); 
+%   // get answer from b
 % }
-% \end{lstlisting}
-% \caption{Main}
-% \label{lst:main}
-% \end{listing}
+% \end{BVerbatim}
+% \hfill
+% \begin{BVerbatim}[baseline=t]
+% // Party2 (Worker)
+% atomically {
+%   // some code before
+%   down(c1); 
+%   // get request from b
+%   // put answer in b
+%   up(c2); 
+%   // some code after 
+% }
+% \end{BVerbatim}
+% \\[0.6ex]
+% Unfortunately, this solution does not work: any admissible execution requires an interleaved scheduling between the two transactions, thus violating isolation; hence, the transactions deadlock as none of them can progress.  It is important to notice that this deadlock arises because synchronization occurs between threads in \emph{different} transactions; 
+% in fact, the solution above is perfectly fine for threads \emph{outside} transactions, or within the \emph{same} transaction.
+% %As mentioned in \cite{hmpm:ppopp2005}, ``two threads can easily deadlock if each awaits some communication from the other''.
 
 
-% We can define functions, \eg $\sin(x)$, with $x\in\R$ and the 2\nd element 
-% is.. And \SAT\ is \NP\complete, ma non mi ricordo chi l'ha 
-% detto\citationeeded.\footnote{LoL}
+% % Paragraph 3: Contribution
+% \section{The proposal of OTM}
+% In order to overcome this limitation, in this paper we propose a programming model for \emph{safe, data-driven} interactions between memory transactions.  The key observation is that \emph{atomicity} and \emph{isolation} should be seen as two disjoint computational aspects:
+% \begin{itemize}
+% \item an atomic \emph{non-isolated} block of code is executed ``all-or-nothing'', but its execution can overlap that of others and \emph{uncontrolled} access to shared data is allowed;
+% \item an \emph{isolated} block of code is intended to be executed ``as it were the only one'' (i.e., in mutual exclusion with other threads), but no rollback on errors/exceptions is provided.
+% \end{itemize} 
+% Thus, a ``normal'' block of code is neither atomic nor isolated; a mutex block (like Java \emph{synchronized} methods) is isolated but not atomic; and a usual transaction is a block which is both atomic and isolated.  Our claim is that atomic non-isolated blocks can be fruitfully used for implementing safe composable interacting memory transactions, henceforth called \emph{open transactions}.
 
-% \fakesection{Altra sezione}
+% In this model, a transaction is composed by several threads, called \emph{participants}, which can cooperate on shared data.  A transaction commits when all its participants commit, and aborts if any thread aborts.  Threads participating to different transactions can access to shared data, but when this happens the transactions are \emph{transparently merged} into a single one.  For instance, the two transactions of the synchronization example above would automatically merge becoming the same transaction, so that the two threads can synchronize and proceed.  Thus, this model relaxes the isolation requirement still guaranteeing atomicity and consistency; moreover, it allows for \emph{loosely-coupled} interactions since transaction merging is driven only by run-time accesses to shared data, without any explicit coordination among the participants beforehand.
+
+
+% In summary, the contributions of this paper are the following:
+% \begin{itemize}
+% \item We present \emph{Open Transactional Memory}, a transactional memory model where multi-threaded transactions can interact by non-isolated access to shared data. Consistency and atomicity are ensured by transparently \emph{merging} transactions at runtime.
+
+% \item We describe this model in the context of Concurrent Haskell (Section \ref{sec:cot}).   We define two monads \emph{OTM} and \emph{ITM}, representing the computational aspects of atomic \emph{multi-threaded open} (i.e., non-isolated) transactions and atomic \emph{single-threaded isolated} transactions, respectively (Figure~\ref{fig:acid-spectrum}).  Using the construct \emph{atomic}, programs in the \emph{OTM} monad are executed ``all-or-nothing'' but without isolation; hence these transactions can merge at runtime. When needed, isolation inside transactions can be guaranteed by the construct \textcode{isolated}.
+% Both OTM and ITM transactions are \emph{composable}, 
+% %: small transactions can be glued together to form larger transactions. 
+% and we exploit Haskell type system to forbid irreversible effects inside these two monads.
+
+% \item We illustrate the effectiveness of this programming model by providing several example implementations, such as barriers, \emph{futures} and Petri nets, among others. Moreover, \emph{OTM} is a conservative extension % (in fact, a drop-in replacement) 
+% of \emph{STM} \citep{hmpm:ppopp2005}; in fact, \emph{atomically} is precisely the composition of \emph{atomic} and \emph{isolated} (Figure~\ref{fig:acid-spectrum}).
+
+% \item We provide a formal operational semantics of our system (Section \ref{sec:semantics}), which is quite rare for a practical programming language. This semantics defines clearly the behaviour also in less intuitive situations, and serves as a reference for implementations.
+% Using this semantics we prove that OTM satisfies the \emph{opacity} correctness criterion for transactions  \cite{gk:ppopp08}.
+% %; in fact, opacity is obtained for free: non-committed transactions can access only to consistent memory.
+
+% \item We give an implementation of OTM as a library for Concurrent Haskell (Section~\ref{sec:implementation}).  Ours is a pure software implementation using existing STM data structures, and does not require any change in the compiler or the runtime environment.
+% \end{itemize}
+% Related work is discussed in Section~\ref{sec:relwork}, and some concluding remarks and directions for future work are in Section~\ref{sec:concl}.
+
+% %By definition, "isolation" means ``the concurrent execution of transactions results in a system state that would be obtained if transactions were executed serially, i.e., one after the other''.  Some executions crucially require concurrent, interleaved executions: example: communication. 
+
+% \begin{figure}
+%     \centering
+%     \begin{tikzpicture}
+%         \node[] (n00) at (0,0) {IO};
+%         \node[] (n01) at (0,1) {OTM};
+%         \node[] (n02) at (0,2) {ITM};
+        
+%         \draw[->] (n02) to node[left] {\textcode{isolated}} (n01);
+%         \draw[->] (n01) to node[left] {\textcode{atomic}} (n00);
+        
+%         \node[] (n20) at (5,0)  {IO};
+%         \node[] (n21) at (5,2){STM};
+        
+%         \draw[->] (n21) to node[right] {\textcode{atomically}} (n20);
+        
+%         \node[] (n10) at (2.5,0) {Consistency, Durability};
+%         \node[] (n11) at (2.5,1) {Atomicity};
+%         \node[] (n12) at (2.5,2) {Isolation};
+            
+%         \draw[gray,dashed] (.3,.5) -- (4.7,.5);
+%         \draw[gray,dashed] (.3,1.5) -- (4.7,1.5);
+%     \end{tikzpicture}
+%     \caption{ACID computations: splitting \textcode{atomically}.}
+%     \label{fig:acid-spectrum}
+% \end{figure}
 
 
 

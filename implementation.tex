@@ -1,12 +1,12 @@
 %!TEX root = thesis.tex
 
-\chapter{Implementation}
+\chapter{Implementation of OTM over the FFI}
 
 At an high level the implementation is subdivided in an Haskell library and a C library.
 The data structures, as well as the operations on them, are defined in the C Header file OTM.h and made available to the Haskell code through the Foreign Function Interface.
 Since the FFI does not provide a type safe marshaling for pointers, we decided to introduce the C2HS preprocessor to our build scheme.
 All the foreign declarations reside in the file Internals.chs and are written with the syntax of C2HS.\cite{Chakravarty2000}
-Finally the OTM interface is exposed by the the Haskell module Control.Monad.OTM and defined in the file OTM.hs.
+Finally the OTM interface shown in \cref{fig:base-interface} is exposed by the the Haskell module Control.Monad.OTM and defined in the file OTM.hs.
 
 \section{Monads TM, OTM and ITM}
 \begin{figure}

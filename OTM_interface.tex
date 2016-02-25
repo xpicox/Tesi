@@ -2,6 +2,7 @@
 
 \chapter{Open Memory Transactions in Haskell}
 
+In this chapter we present the OTM model and his interface in Haskell.
 Haskell was chosen as the development language because of its very expressive type system that offers a perfect environment for studying the ideas of transactional memory.
 In \cite{Harris:2005:CMT:1065944.1065952} this has been used to single out computations which may be used in transactions, from those which can perform irreversible I/O effects. 
 In the implementation, this idea is further improved by using the type system to separate \emph{isolated} transactions from those who can interact, and hence be merged.
