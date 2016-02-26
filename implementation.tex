@@ -2,6 +2,7 @@
 
 \chapter{Implementation of OTM over the FFI}
 
+\label{chap:implementation}
 At an high level the implementation is subdivided in an Haskell library and a C library.
 The data structures, as well as the operations on them, are defined in the C Header file OTM.h and made available to the Haskell code through the Foreign Function Interface.
 Since the FFI does not provide a type safe marshaling for pointers, we decided to introduce the C2HS preprocessor to our build scheme.
@@ -229,9 +230,9 @@ When the state changes, it means that the transaction's \emph{voting phase} ende
 If the new state is \emph{Co\textlangle n, l\textrangle}, the transaction initiate the \emph{committing phase} and the value \emph{n} represents the numebr of threads that have to commit their working memory.
 Each thread updates the \emph{current value} of the \emph{OTVars} in its transactional record with the value held by the \emph{delta memory}. When a thread updates all the variables in its transactional log, it acknowledges the transaction decrementing the number of \emph{committing threads}.
 If the \emph{agreed} state is one of \emph{Re\textlangle n, l\textrangle} and \emph{Ab\textlangle n, l\textrangle} the transactional record is discarded, the threads disjointed, and the transaction re-executed. The re-execution of a transaction is managed by the function:
-\begin{Verbatim}
+\begin{lstlisting}
 otmHandleTransaction:: OTRec -> OTM a -> OTState -> IO a
-\end{Verbatim}
+\end{lstlisting}
 
 If an exceptional value of type \emph{RetryException} is returned by the OTM computation, the thread calls \emph{otmRetry} to move the transaction in the state \emph{Re\textlangle l,l\textrangle} and wait that the other threads acknowledge and agree on the new state. If other exceptions are caught, \emph{otmAbort} is called, and the exception is propagated outside the transaction. If a transaction aborts or retries, all the threads retry the execution with a fresh transactional log, except the one that threw the exception.
 
@@ -248,13 +249,11 @@ Transaction merging is triggered by operations on the shared memory.
 This operations are reads and writes of \emph{OTVar}s in the OTM monad, and commits of isolated transactions.
 
 \begin{figure}
-\begin{Verbatim}
+\begin{lstlisting}
 -- Haskell declaration
 otmReadOTVar :: OTRec -> OTVar a -> IO (StablePtr a)
 
--- C implementation
-\end{Verbatim}
-\begin{lstlisting}[language=C]
+-- C declaration
 HsStablePtr otmReadOTVar(OTRecHeader* trec, OTVar* otvar) {
     TRACE("trec: %p read  %p", trec, otvar);
     assert(trec -> forward_trec != NULL);
@@ -277,7 +276,7 @@ HsStablePtr otmReadOTVar(OTRecHeader* trec, OTVar* otvar) {
 \end{figure}
 
 The first time an \emph{OTVar} is accessed, it is \emph{acquired} by the transaction that requested the operation: its \emph{delta memory}, initially empty, is filled in with an \emph{OTVarDelta} containing the \emph{shared value} and a reference to the transaction which is acquiring the variable.
-As shown in \cref{fig:otmread} line 5, the \emph{acquiring phase} is the first phase of a read or a write in the OTM monad.
+As shown in \cref{fig:otmread} line 9, the \emph{acquiring phase} is the first phase of a read or a write in the OTM monad.
 This phase is a tentative update of the \emph{delta memory} of an \emph{OTVar} carried out atomically by means a \emph{compare\&swap} instruction: if it fails, the \emph{OTVar}'s \emph{delta memory} was not empty, thus the variable had already been acquired by another transaction.
 
 \begin{figure}
@@ -330,7 +329,7 @@ HsBool otmUnion(OTRecHeader* trec1, OTRecHeader* trec2){
 \label{fig:otmunion}
 \end{figure}
 
-When a transaction reads or writes an owned \emph{OTVar}, the function \emph{otmUnion} is called (\cref{fig:otmread} line 6).
+When a transaction reads or writes an owned \emph{OTVar}, the function \emph{otmUnion} is called (\cref{fig:otmread} line 10).
 To represent transaction merges we opted for a Union-Find data structure with the heuristics of \emph{path compression} and \emph{union by rank}.
 Each transactional record has a \emph{forward transaction} field that stores the information needed by the data structure: the \emph{rank} of that node and a reference to the \emph{root} of the set.
 We followed the implementation proposed by \citet{Anderson94wait-freeparallel} where operations on the data structure are lock free.

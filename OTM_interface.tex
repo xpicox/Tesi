@@ -1,7 +1,7 @@
 %!TEX root = thesis.tex
 
 \chapter{Open Memory Transactions in Haskell}
-
+\label{chap:otm}
 In this chapter we present the OTM model and his interface in Haskell.
 Haskell was chosen as the development language because of its very expressive type system that offers a perfect environment for studying the ideas of transactional memory.
 In \cite{Harris:2005:CMT:1065944.1065952} this has been used to single out computations which may be used in transactions, from those which can perform irreversible I/O effects. 
@@ -53,9 +53,9 @@ Following this perspective, at the type system level we distinguish isolated ato
 The function \textcode{isolated} takes an isolated atomic action and delivers an atomic action whose effects are guaranteed to be executed in isolation with respect to other actions.
 Then, \emph{atomic} takes an atomic action and delivers an I/O action that when performed runs a transaction whose effects are kept tentative until it commits.
 Tentative effects are shared among all non isolated transactions. Values of type \emph{STM a} can be seen as values of type \emph{ITM a}: the I/O they deliver is the same, since \emph{atomically} can be expressed as:
-\begin{Verbatim}
+\begin{lstlisting}
     atomically = atomic . isolated
-\end{Verbatim}
+\end{lstlisting}
 
 Like \emph{STM}, \emph{OTM} provides a mechanism for safe thread
 communication by means of transactional variables called \emph{OTVars}
@@ -64,13 +64,12 @@ These are values of type \emph{OTVar a} where \emph{a} is the type of value held
 Creating, reading and writing \emph{OTVars} is done via the interface defined by the \emph{MonadTM} class shown in \cref{fig:base-interface}. 
 All these actions are both atomic and isolated, thus, when it comes to actions of type \emph{ITM a}, \emph{OTVars} are basically \emph{TVars};
 \eg \emph{modifyTVar} from \emph{STM} corresponds to:
-
-\begin{Verbatim}
+\begin{lstlisting}
     modifyOTVar :: OTVar a -> (a -> a) -> ITM ()
     modifyOTVar var f = do
         x <- readOTVar var
         writeOTVar var (f x) 
-\end{Verbatim}
+\end{lstlisting}
 From its type it is immediate to see that the update is both atomic and isolated. In fact, read and write operations are glued together by the \textgreater \textgreater= combinator, preserving both properties.
 
 \section{Blocking}
@@ -80,42 +79,42 @@ been scheduled too soon''. As for \emph{STM}, retrying a transactional action
 actually corresponds to block the threads on some condition. Both isolated and non-isolated transactions are instances of \emph{MonadTransaction} class described in \cref{fig:base-interface}.
 
 Checks may be declared as follows:
-\begin{Verbatim}[tabsize=3, xleftmargin=1ex, gobble=1]
-    check :: Bool -> ITM ()
-    check b = if b then return () else retry
-\end{Verbatim}
+\begin{lstlisting}
+check :: Bool -> ITM ()
+check b = if b then return () else retry
+\end{lstlisting}
 and invariants on transactional variables can be easily checked by composing reads and checks as follow:
-\begin{Verbatim}
-    assertOTVar :: OTVar a -> (a -> Bool) -> ITM ()
-    assertOTVar var p = do
-        x <- readOTVar var
-        check (p x)
-\end{Verbatim}
+\begin{lstlisting}
+assertOTVar :: OTVar a -> (a -> Bool) -> ITM ()
+assertOTVar var p = do
+    x <- readOTVar var
+    check (p x)
+\end{lstlisting}
 
 Synchronization primitives, such as semaphores, can be easily implemented with isolated actions.
 A semaphore is a counter with two fundamental operations: \emph{up} which increments the counter and \emph{down} which decrements the counter if it is not zero and blocks otherwise.
 Semaphores are implemented using \emph{OTM} as \emph{OTVars} holding a counter:
-\begin{Verbatim}[tabsize=3, xleftmargin=1ex, gobble=1]
-    type Semaphore = OTVar Int
-\end{Verbatim}
+\begin{lstlisting}
+type Semaphore = OTVar Int
+\end{lstlisting}
 Then, \textcode{up} and \textcode{down} are even more immediate than their description:
-\begin{Verbatim}
-    up :: Semaphore -> ITM ()
-    up var = modifyOTvar var (1+)
+\begin{lstlisting}
+up :: Semaphore -> ITM ()
+up var = modifyOTvar var (1+)
 
-    down :: Semaphore -> ITM ()
-    down var = do
-        assertOTVar var (> 0)
-        modifyOTVar var (-1+)
-\end{Verbatim}
+down :: Semaphore -> ITM ()
+down var = do
+    assertOTVar var (> 0)
+    modifyOTVar var (-1+)
+\end{lstlisting}
 Both are atomic and isolated updates with the latter being guarded by a pre-condition.
 
 Actions can also be composed as \emph{alternatives} by means of the primitive \emph{orElse}. For instance, the following takes a family of semaphores and delivers an action that decrements one of them, and blocking only if none can be decremented:
-\begin{Verbatim}
-    downAny :: [Semaphore] -> ITM ()
-    downAny (x:xs) = down x `orElse` downAny xs
-    downAny [] = retry
-\end{Verbatim}
+\begin{lstlisting}[language=haskell]
+downAny :: [Semaphore] -> ITM ()
+downAny (x:xs) = down x `orElse` downAny xs
+downAny [] = retry
+\end{lstlisting}
 
 \section{Thread interaction}
 
@@ -461,3 +460,59 @@ For instance, consider the Petri net below:
 Since $p_1$ has only one token either $t_1$ or $t_2$ fires. In fact,
 whenever $t_2$ acquires the token it will fail to acquire the other
 from $p_2$ and hence its transaction retries releasing the token.
+\newpage
+\paragraph{Dinning philosophers}
+\begin{figure}
+    \centering
+    \begin{tikzpicture}[rotate=90]
+        \def \k {7}
+        \def \radius {2cm}
+        
+        \foreach \s in {1,...,\k} {
+            \draw 
+                let 
+                    \n1={-360/\k * (\s-1)}
+                in 
+                node [place,tokens=1,rotate=\n1,label=90:$p_\s$] 
+                    (p\s) at (\n1:\radius) {};
+        }
+        \foreach \s in {1,...,\k} {
+            \draw 
+                let 
+                    \n1={int(mod(\s,\k)+1)},
+                    \n2={-360/\k * (\s-1) - 360/(\k*2)}
+                in 
+                node [transition, rotate=\n2,label=90:$t_\s$]
+                    (t\s) at 
+%                    (\n2:\radius)
+                    ($(p\s)!.5!(p\n1)$) 
+                    {}
+                    edge [pre, bend right]  (p\s)
+                    edge [pre, bend left]  (p\n1)
+                    edge [post, bend left] (p\s)
+                    edge [post, bend right] (p\n1);
+        }
+    \end{tikzpicture}
+    \begin{Verbatim}[tabsize=3, gobble=2]
+        philosophers k = pairs >>= mapM_ philosopher
+            where
+                philosopher (l,r) = transaction [l,r] [l,r] 
+                right = atomic . sequence . take k . repeat $ newPlace 1
+                left  = take k . drop 1 . cycle <$> right
+                pairs = zip <$> right <*> left
+    \end{Verbatim}
+\caption{Petri's dining philosophers.}
+\label{fig:example-petri-philosophers}
+\end{figure}
+
+Dijkstra's \emph{dining philosophers problem} is a textbook
+classic of concurrency theory. This problem can be modelled using Petri 
+nets representing each fork and philosopher as a place and as a transition
+respectively (Figure~\ref{fig:example-petri-philosophers}).
+Then, we can use the above implementation of Petri nets to simulate
+$k$ philosophers on $k$ threads. Under the assumption of fair scheduling,
+no execution locks.
+
+With minor variations to \textcode{transaction}, the above 
+implementation can be used to orchestrate code, using 
+abstract models based on Petri nets.

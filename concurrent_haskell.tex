@@ -1,6 +1,7 @@
 %!TEX root = thesis.tex
 
 \chapter{Haskell and Concurrency}
+\label{chap:haskell}
 
 Haskell is a functional programming language, whose syntax and semantics are defined in the ``Haskell Report'' of which the latest revision is Haskell 2010 \cite{Marlow_haskell2010}. Haskell was created by several academic researchers interested in functional languages, to address the lack of a common language that could be used as a focus for their research.
 
@@ -12,18 +13,25 @@ Two features make it stand out amongst the programming languages crowd:
 
 I/O operations do not fit the functional paradigm because side effects are not permitted and laziness gives deliberately unspecified order of evaluation.
 
-In Haskell, reconcile I/O operations with this features has been achieved by means the IO monad.\cite{PeytonJones:1993:IFP:158511.158524}
-\todo{A monad is \url{https://en.wikipedia.org/wiki/Monad\_(functional\_programming)\#Formal\_definition} data constructor, bind and return. Monad laws.
-A type to be defined a \emph{monad} must have the following components:
-\begin{itemize}
-\item A data constructor.
-\item A unit function that injects a type in the corresponding monadic type.
-\item A binding operation to combine two monadic actions.
-\end{itemize}
-}
-\todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
-As shown in \cref{}, a value of type \emph{IO a} is a monadic action implemented as a function which takes as its input a value representing the entire current state of the world and returns a pair consisting of a value representing the new state of the world, and the result of type \emph{a}.
-This introduces \emph{data dependencies} between monadic actions, because each action depends on the \emph{RealWord} value computed by the previous one, hence, preventing the compiler from reordering actions, \emph{sequencing} is introduced for I/O operations.
+In Haskell, reconcile I/O operations with this features has been achieved by means the IO monad \cite{PeytonJones:1993:IFP:158511.158524}.
+%\todo{A monad is \url{https://en.wikipedia.org/wiki/Monad\_(functional\_programming)\#Formal\_definition} data constructor, bind and return. Monad laws.
+% A type to be defined a \emph{monad} must have the following components:
+% \begin{itemize}
+% \item A data constructor.
+% \item A unit function that injects a type in the corresponding monadic type.
+% \item A binding operation to combine two monadic actions.
+% \end{itemize}
+% }
+%\todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
+\begin{figure}
+\begin{lstlisting}
+newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
+\end{lstlisting}
+\caption{IO type definition}
+\label{fig:io}
+\end{figure}
+As shown in \cref{fig:io}, a value of type \emph{IO a} is a monadic action implemented as a function which takes as its input a value representing the entire current state of the world and returns a pair consisting of a value representing the new state of the world, and the result of type \emph{a}.
+This introduces \emph{data dependency} between monadic actions, because each action depends on the \emph{RealWord} value computed by the previous one, hence, preventing the compiler from reordering actions, \emph{sequencing} is introduced for I/O operations.
 Besides I/O operations, values of IO include operations with side effects on mutable data types, \eg, a mutable variable has type \emph{IORef a} and may be accessed only via the following operations:
 
 \begin{lstlisting}
@@ -50,7 +58,7 @@ putMVar  :: MVar a -> a -> IO ()
 The first empties a full \emph{MVar}, if it is empty the thread waits until is filled. The second fills an empty \emph{MVar} and blocks the thread if it is full. \emph{MVars} can be though as one place channels, or as binary semaphores for thread synchronization.
 
 \section{Haskell STM}
-
+\label{sec:stm}
 Haskell STM is part of Concurrent Haskell, and adds \emph{transactional actions} that operate on \emph{transactional memory} for safe thread communication. Transactional memory locations are called \emph{transactional variables} or \emph{TVars}.
 Transactional actions have type \emph{STM a} and are combined sequentially with the bind operator.
 An STM action is provisional during its entire execution and its effects are exposed to the rest of the system by 
@@ -102,5 +110,3 @@ Besides the bind operator, that sequentially combines transactions, the primitiv
 orElse :: STM a -> STM a -> STM a
 \end{lstlisting}
 combines transactions as \emph{alternatives}. The \emph{orElse} executes the first transaction, if it retries then is abandoned with no effect and the second is started. If the second retries too, the entire call retries and waits on the variables read by either of the two nested transactions.  
-\todo{Esempio: filosofi?}
-%In \cref{} is shown the interface of STM. Side effects of transactions on the transactional memory must be delivered through the \emph{atomically} function. A blocking mechanism is introduces 

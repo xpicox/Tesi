@@ -1,6 +1,7 @@
 %!TEX root = thesis.tex
 
 \chapter{GHC and STM}
+\label{chap:ghc}
 
 The first implementation, proposed by \citet{Toneguzzo}, made a heavy use of Haskell STM: all the operations performed on shared data structures were executed by STM transactions. Since this work aims to be an alternative to STM, we decided to set up a new implementation that does not have the STM as a dependency. This led us to thoroughly study STM and the GHC internals.
 
@@ -13,7 +14,7 @@ At the highest level GHC can be divided into two parts:
  \item The compiler itself. This is an Haskell program whose job is to convert Haskell source code into executable machine code.
  \item The Runtime System (RTS). This is a large library of C code that handles all the tasks associated with running the compiled Haskell code, including garbage collection, thread scheduling, profiling, exception handling. The RTS is linked into every compiled Haskell program.
  \end{itemize}
-The compilation route of a source file involves several phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, translating Haskell syntax into a much smaller language called \emph{Core}. The next phase is the optimization one: there are about six passes of optimization each of which takes \emph{Core} and produces \emph{Core}; in this phase, optimizations like dead code elimination, constants propagation or function inlining are applied to the program. Once the \emph{Core} program has been optimized, the process of code generation begins. The code generator first converts the \emph{Core} into a language called \emph{STG}, which is essentially just \emph{Core} annotated with more information required by the code generator. Then, \emph{STG} is translated to \emph{Cmm}, a low-level imperative language with an explicit stack. Finally, the \emph{Cmm} is converted to LLVM code (IR) and passed to the LLVM compiler that produces the native code.\todo{Menzionare la figura della pipeline}
+The compilation route of a source file involves several phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages as shown in \cref{fig:pipeline}: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, translating Haskell syntax into a much smaller language called \emph{Core}. The next phase is the optimization one: there are about six passes of optimization each of which takes \emph{Core} and produces \emph{Core}; in this phase, optimizations like dead code elimination, constants propagation or function inlining are applied to the program. Once the \emph{Core} program has been optimized, the process of code generation begins. The code generator first converts the \emph{Core} into a language called \emph{STG}, which is essentially just \emph{Core} annotated with more information required by the code generator. Then, \emph{STG} is translated to \emph{Cmm}, a low-level imperative language with an explicit stack. Finally, the \emph{Cmm} is converted to LLVM code (IR) and passed to the LLVM compiler that produces the native code.
 
 \begin{figure}
 \begin{center}
@@ -66,7 +67,7 @@ Every \emph{Closure} is a contiguous block of memory, consisting of a fixed-form
 The most important part of the header is the \emph{info pointer},  which points to the info table for the closure.
 
 The \emph{info table} contains all the information that the runtime needs to know about the closure.
-Info tables are contiguous blocks of memory that, in addition to provide informations for the storage manager, contain the type of the closure and the \emph{entry code}, \ie the machine code that will evaluate the closure.\todo{Aggiungere schema Closure + Info Table. Vedi GHC Commentary: \url{https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/HeapObjects?redirectedfrom=Commentary/Rts/HeapObjects} }
+Info tables are contiguous blocks of memory that, in addition to provide informations for the storage manager, contain the type of the closure and the \emph{entry code}, \ie the machine code that will evaluate the closure.
 
 Heap objects can be classified in:
 \begin{itemize}
@@ -103,7 +104,7 @@ For each OS Thread known to the runtime, a \emphidx{Task} structure is created. 
 
 Haskell threads, the ones provided by Concurrent Haskell, are lightweight threads represented by a \emphidx{Thread State Object} (TSO), an ordinary heap objects that contains the complete state of a thread and its stack.
 Lightweight threads, otherwise known as green threads or user-space threads,
-are a well-known technique for avoiding the overhead of operating system threads: managing threads in user space is cheaper, because fewer traps into the operating system are required, letting the scheduler to manage threads by the million.\todo{Rivedere sta frase, non suona bene.}
+are a well-known technique for avoiding the overhead of operating system threads: managing threads in user space is cheaper, because fewer traps into the operating system are required, letting the scheduler to manage thousands of threads.
 
 Finally the scheduler has its own representation of a CPU, called a \emphidx{Capability}. The number of \emph{Capabilities} should be  chosen to be the same as the number of real CPU cores, so that the scheduler never tries to run more Haskell threads simultaneously than the real CPUs available.
 The main components of a Capability are:
@@ -117,7 +118,7 @@ The main components of a Capability are:
 
 Among the features offered by the RTS, there is also the support for GHC's Software Transactional Memory implementation.
 This implementation is split into two layers.
-The top layer implements the STM operations described in \ref{cc}.
+The top layer implements the STM operations described in \cref{sec:stm}.
 This is built on top of the lower layer, which comprises a C library for performing memory transactions that is integrated in the Haskell runtime system.
 The lower layer functionalities are made available to Haskell code through the \emphidx{Primitive Operations} (PrimOps), \ie functions that, in the case of STM, are implemented by handwritten Cmm code.
 As will be shown, STM takes full advantage from the explicit stack management offered by the Cmm language.
@@ -147,7 +148,7 @@ The \emph{retry} PrimOp unwinds the stack in search of an STM's frame and depend
 \begin{itemize}
 \item
 In the case of an \emph{AtomicallyFrame}, stmWait is called.
-The validation procedure is performed\todo{se è un sinonimo è meglio, parola già usata nella frase a inizio paragrafo} to check that the transaction log has seen a consistent view of the heap, and if not the transaction is re-run.
+The validation procedure is performed to check that the transaction log has seen a consistent view of the heap, and if not the transaction is re-run.
 In the consistent case, it allocates new \emph{wait-queue entries}, held in  lists attached to the TVars that the transaction has read.
 Once this is done, the calling thread is responsible for blocking itself and reentering the scheduler. The wait queue entries are noticed by a commit which updates the TVars: the updater unblocks any waiters it encounters.
 \item
@@ -176,9 +177,9 @@ Finally, the FFI defines two kinds of pointers that rule the memory management o
 \begin{itemize}
 \item \emphidx{Foreign Pointers} represent references to objects that are maintained in a foreign language, \ie that are not part of memory managed by the Haskell storage manager.
 The essential difference between a foreign pointer and a raw pointer is that the former may be associated with a \emph{finalizer}, \ie, a routine that is invoked when the Haskell storage manager detects that there are no more references left that are pointing to the \emph{Foreign Pointer}.
-So the \emph{finalizer} is responsible to free the resource bound to the foreign pointer. \todo{Forse si potrebbe aggiungere la firma di newForeignPtr}
+So the \emph{finalizer} is responsible to free the resource bound to the foreign pointer.
 
 \item \emphidx{Stable Pointers}\label{ffi:stableptr} resolve the dual problem: the life span of an Haskell object is no longer managed by the storage manager, indeed it becomes responsibility of the programmer to release the resource.
 The function \emph{newStablePtr} creates a stable pointer referring to the given Haskell value and as long as \emph{freeStablePtr} is not called, that pointer will remain valid.
-So a \emph{Stable Pointer} is a reference to a Haskell expression that is guaranteed not to be affected by garbage collection, i.e., it will neither be deallocated nor will the value of the stable pointer itself change during garbage collection. \emph{Stable Pointers} can be passed to foreign code, which can treat it as an opaque reference to a Haskell value. \todo{Forse si potrebbe aggiungere le firme di newStablePtr e freeStablePtr}
+So a \emph{Stable Pointer} is a reference to a Haskell expression that is guaranteed not to be affected by garbage collection, i.e., it will neither be deallocated nor will the value of the stable pointer itself change during garbage collection. \emph{Stable Pointers} can be passed to foreign code, which can treat it as an opaque reference to a Haskell value.
 \end{itemize}
