@@ -3,35 +3,9 @@
 \chapter{Implementation of OTM over the FFI}
 
 \label{chap:implementation}
-At an high level the implementation is subdivided in an Haskell library and a C library.
-The data structures, as well as the operations on them, are defined in the C Header file OTM.h and made available to the Haskell code through the Foreign Function Interface.
-Since the FFI does not provide a type safe marshaling for pointers, we decided to introduce the C2HS preprocessor to our build scheme.
-All the foreign declarations reside in the file Internals.chs and are written with the syntax of C2HS.\cite{Chakravarty2000}
-Finally the OTM interface shown in \cref{fig:base-interface} is exposed by the the Haskell module Control.Monad.OTM and defined in the file OTM.hs.
-
-\begin{figure}
-\begin{minipage}[b]{0.7\textwidth}
-    \begin{lstlisting}[language=Haskell]
-type TM = StateT OTRec (ExceptT RetryException IO)
-
-newtype OTM a = OTM { unOTM :: TM a }
-    deriving (Functor, Applicative, Monad)
-
-newtype ITM a = ITM { unITM :: TM a }
-    deriving (Functor, Applicative, Monad)
-
-evalOTM :: OTM a -> OTRec -> IO (Either RetryException a)
-evalOTM otm s = runExceptT . flip evalStateT s $ unOTM otm
-
-evalITM :: ITM a -> OTRec -> IO (Either RetryException a)
-evalITM itm s = runExceptT . flip evalStateT s $ unITM itm
-    \end{lstlisting}
-    \caption{Monads of the OTM library}
-    \label{fig:monads}
-\end{minipage}
-%
-\begin{minipage}[b]{0.3\textwidth}
-    \centering
+\begin{wrapfigure}{r}{0.27\textwidth}
+\vspace{-30pt}
+\centering
     \begin{tikzpicture}[
             lbl/.style={
               text width=2.9cm,
@@ -49,17 +23,44 @@ evalITM itm s = runExceptT . flip evalStateT s $ unITM itm
 
     \end{tikzpicture}
     \caption{Library overview}
-\end{minipage}
+\end{wrapfigure}
+
+At an high level the implementation is subdivided in an Haskell library and a C library.
+The data structures, as well as the operations on them, are defined in the C Header file OTM.h and made available to the Haskell code through the Foreign Function Interface.
+Since the FFI does not provide a type safe marshaling for pointers, we decided to introduce the C2HS preprocessor to our build scheme.
+All the foreign declarations reside in the file Internals.chs and are written with the syntax of C2HS.\cite{Chakravarty2000}
+Finally the OTM interface shown in \cref{fig:base-interface} is exposed by the the Haskell module Control.Monad.OTM and defined in the file OTM.hs.
+
+\begin{figure}[b]
+\begin{lstlisting}[language=Haskell]
+type TM = StateT OTRec (ExceptT RetryException IO)
+
+newtype OTM a = OTM { unOTM :: TM a }
+    deriving (Functor, Applicative, Monad)
+
+newtype ITM a = ITM { unITM :: TM a }
+    deriving (Functor, Applicative, Monad)
+
+evalOTM :: OTM a -> OTRec -> IO (Either RetryException a)
+evalOTM otm s = runExceptT . flip evalStateT s $ unOTM otm
+
+evalITM :: ITM a -> OTRec -> IO (Either RetryException a)
+evalITM itm s = runExceptT . flip evalStateT s $ unITM itm
+\end{lstlisting}
+\caption{Monads of the OTM library}
+\label{fig:monads}
 \end{figure}
 
 \section{Monads TM, OTM and ITM}
 The \emph{TM Monad} is the hearth of our transactional memory implementation;
-the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
+as shown in \cref{fig:monads}, the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
 The \emph{TM Monad} is a type synonym for a stack of monad transformers that solve the following constraints:
-reads and writes are foreign functions with side effects, thus the IO monad is the innermost;
-transactions may explicitly fail, \ie, call \emph{retry}, thus the \emph{ExceptT} monad transformer allows computations to terminate with an exceptional value,
-furthermore transactions need to keep track of their state, reads and tentative writes, thus the \emph{StateT} monad transformer adds a transactional log as the state of the computation.
+\begin{itemize}
+\item reads and writes are foreign functions with side effects, thus the IO monad is the innermost;
+\item transactions may explicitly fail, \ie, call \emph{retry}, thus the \emph{ExceptT} monad transformer allows computations to terminate with an exceptional value;
+\item transactions need to keep track of their state, reads and tentative writes, thus the \emph{StateT} monad transformer adds a transactional log as the state of the computation.
 
+\end{itemize}
 \section{Transactional record and OTVars}
 \begin{figure}[t]
 \begin{lstlisting}
@@ -87,6 +88,7 @@ typedef struct {
 } OTVar;
 \end{lstlisting}
 \caption{Data structures}
+\vspace{-8pt}
 \end{figure}
 The transactional record (\emph{OTRec}) contains an entry for each \emph{OTVar} that the transaction has accessed.
 Each entry in the transactional log is an \emph{OTRecEntry} that contains a reference to the \emph{OTVar} involved and two additional fields used only by \emph{Isolated Transaction}.
@@ -101,8 +103,6 @@ The same stable pointer could be copied in the working memory of several transac
 The transactional record contains additional informations that describe the state of the transaction, \ie, in which phase of the life cycle it is, the number of total threads participating to this transaction and the number of threads that are still running.
 
 The \emph{OTRec} and the \emph{OTVar} are allocated by the foreign code, but wrapped inside a \emph{Foreign Pointer} so their life span is managed by the garbage collector.
-
-
 
 \section{Transaction life-cycle}
 

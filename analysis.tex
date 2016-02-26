@@ -3,6 +3,7 @@
 \chapter{GHC and STM}
 \label{chap:ghc}
 
+In this chapter we present an overview of the Haskell compiler and the runtime system.
 The first implementation, proposed by \citet{Toneguzzo}, made a heavy use of Haskell STM: all the operations performed on shared data structures were executed by STM transactions. Since this work aims to be an alternative to STM, we decided to set up a new implementation that does not have the STM as a dependency. This led us to thoroughly study STM and the GHC internals.
 
 
@@ -14,7 +15,7 @@ At the highest level GHC can be divided into two parts:
  \item The compiler itself. This is an Haskell program whose job is to convert Haskell source code into executable machine code.
  \item The Runtime System (RTS). This is a large library of C code that handles all the tasks associated with running the compiled Haskell code, including garbage collection, thread scheduling, profiling, exception handling. The RTS is linked into every compiled Haskell program.
  \end{itemize}
-The compilation route of a source file involves several phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages as shown in \cref{fig:pipeline}: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, translating Haskell syntax into a much smaller language called \emph{Core}. The next phase is the optimization one: there are about six passes of optimization each of which takes \emph{Core} and produces \emph{Core}; in this phase, optimizations like dead code elimination, constants propagation or function inlining are applied to the program. Once the \emph{Core} program has been optimized, the process of code generation begins. The code generator first converts the \emph{Core} into a language called \emph{STG}, which is essentially just \emph{Core} annotated with more information required by the code generator. Then, \emph{STG} is translated to \emph{Cmm}, a low-level imperative language with an explicit stack. Finally, the \emph{Cmm} is converted to LLVM code (IR) and passed to the LLVM compiler that produces the native code.
+The compilation pipeline of a source file involves several phases, with the output of each phase becoming the input of the subsequent phase. What distinguishes GHC from other compilers, and is worth mentioning, is that the source code is translated into several intermediate languages as shown in \cref{fig:pipeline}: in a first phase the source code is parsed and type-checked, then all the syntactic sugar, \ie syntactic constructs that can be translated into simpler constructs, is removed, translating Haskell syntax into a much smaller language called \emph{Core}. The next phase is the optimization one: there are about six passes of optimization each of which takes \emph{Core} and produces \emph{Core}; in this phase, optimizations like dead code elimination, constants propagation or function inlining are applied to the program. Once the \emph{Core} program has been optimized, the process of code generation begins. The code generator first converts the \emph{Core} into a language called \emph{STG}, which is essentially just \emph{Core} annotated with more information required by the code generator. Then, \emph{STG} is translated to \emph{Cmm}, a low-level imperative language with an explicit stack. Finally, the \emph{Cmm} is converted to LLVM code (IR) and passed to the LLVM compiler that produces the native code.
 
 \begin{figure}
 \begin{center}
@@ -81,7 +82,7 @@ Heap objects can be classified in:
 
 The \emph{executive objects} are the citizens of an Haskell program. Among \emph{executive objects} there are:
 \begin{itemize}
-\item Constructors: used to represent data constructors. Their payload consists of the fields of the constructor.
+\item Constructors: used to represent data constructors, whose payload are the fields of the constructor.
 \item Primitive objects: used to represent mutable objects such as mutable arrays, mutable variables, MVars and TVars. Their payload varies according to the kind of object.
 \item Function closures: used to represent functions. Their payload (if any) consists of the free variables of the function.
 \item Thunks: used to represent unevaluated expressions which will be updated with their result. The entry code for a thunk starts by pushing an \emph{update frame} onto the stack. When evaluation of the thunk completes, the update frame will cause the thunk to be overwritten again with an \emph{indirection} to the result of the thunk.
@@ -106,7 +107,7 @@ Haskell threads, the ones provided by Concurrent Haskell, are lightweight thread
 Lightweight threads, otherwise known as green threads or user-space threads,
 are a well-known technique for avoiding the overhead of operating system threads: managing threads in user space is cheaper, because fewer traps into the operating system are required, letting the scheduler to manage thousands of threads.
 
-Finally the scheduler has its own representation of a CPU, called a \emphidx{Capability}. The number of \emph{Capabilities} should be  chosen to be the same as the number of real CPU cores, so that the scheduler never tries to run more Haskell threads simultaneously than the real CPUs available.
+Finally the scheduler has its own representation of a CPU, called a \emphidx{Capability}. The number of \emph{Capabilities} should be chosen, with the option +RTS -N, to be the same as the number of real CPU cores, so that the scheduler never tries to run more Haskell threads simultaneously than the real CPUs available.
 The main components of a Capability are:
 \begin{itemize}
 \item The registers of the virtual machine;
@@ -121,7 +122,7 @@ This implementation is split into two layers.
 The top layer implements the STM operations described in \cref{sec:stm}.
 This is built on top of the lower layer, which comprises a C library for performing memory transactions that is integrated in the Haskell runtime system.
 The lower layer functionalities are made available to Haskell code through the \emphidx{Primitive Operations} (PrimOps), \ie functions that, in the case of STM, are implemented by handwritten Cmm code.
-As will be shown, STM takes full advantage from the explicit stack management offered by the Cmm language.
+As it will be shown, STM takes full advantage from the explicit stack management offered by the Cmm language.
 
 \subsection{STM implementation}
 While executing a memory transaction, a thread-local \emph{transaction log} is built up recording the reads and tentative writes that the transaction has performed.
@@ -131,7 +132,7 @@ The log contains an entry for each of the TVars that the memory transaction has 
 Each entry, represented by the structure stgTRecEntry, contains a reference to the \emph{TVar} involved, the \emph{old value} held in the TVar when it was first accessed in the transaction, and the \emph{new value} to be stored in the TVar if the transaction commits.
 These two values are identical in the case a TVar has been read but not written by the transaction.
 
-Within a memory transaction, all TVar accesses are performed by the primitive operations stg\_readTVarzh and stg\_writeTVarzh. These accesses remain buffered within the thread’s log, and hence invisible to other threads, until the transaction commits: writes are made to the log, and reads first consult the log so that they see preceding writes from the same transaction.
+Within a memory transaction, all TVar accesses are performed by the primitive operations readTVarzh and writeTVarzh. These accesses remain buffered within the thread’s log, and hence invisible to other threads, until the transaction commits: writes are made to the log, and reads first consult the log so that they see preceding writes from the same transaction.
 
 \subsection{Validation and commit}
 

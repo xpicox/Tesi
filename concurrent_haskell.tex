@@ -8,12 +8,12 @@ Haskell is a functional programming language, whose syntax and semantics are def
 Two features make it stand out amongst the programming languages crowd:
 \begin{itemize}
 \item It is \emph{purely functional}, \ie functions can not have side effects or mutate data; for a given input a function always gives the same result.
-\item It is \emph{lazy}. Unlike the majority of the programming languages, Haskell does not use strict evaluation: an evaluation strategy in which the arguments of a function are evaluated before the function is called. In Haskell the arguments to a function are passed \emph{unevaluated}, and only evaluated on demand.
+\item It is \emph{lazy}. Unlike the majority of the programming languages, Haskell does not use strict evaluation, in which the arguments of a function are evaluated before the function is called. In Haskell the arguments to a function are passed \emph{unevaluated}, and only evaluated on demand.
 \end{itemize}
 
 I/O operations do not fit the functional paradigm because side effects are not permitted and laziness gives deliberately unspecified order of evaluation.
 
-In Haskell, reconcile I/O operations with this features has been achieved by means the IO monad \cite{PeytonJones:1993:IFP:158511.158524}.
+In Haskell, reconciling I/O operations with this features has been achieved by means the IO monad \cite{PeytonJones:1993:IFP:158511.158524}.
 %\todo{A monad is \url{https://en.wikipedia.org/wiki/Monad\_(functional\_programming)\#Formal\_definition} data constructor, bind and return. Monad laws.
 % A type to be defined a \emph{monad} must have the following components:
 % \begin{itemize}
