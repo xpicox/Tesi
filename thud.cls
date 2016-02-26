@@ -107,11 +107,11 @@
 
 \gdef\thud@universityA{%
     Universit\`a degli Studi di Udine\\[\thud@unisep]%
-    Dipartimento di Matematica e Informatica\\[\thud@unisep]%
+    Dipartimento di Scienze Matematiche, Informatiche e Fisiche\\[\thud@unisep]%
     \ifcase\thud@target Corso di Laurea\or Corso di Laurea Magistrale\or Dottorato di Ricerca\fi\space in \thud@course%
 }
 \gdef\thud@universityB{%
-    Dipartimento di Matematica e Informatica\\%
+    Dipartimento di Scienze Matematiche, Informatiche e Fisiche\\%
     Universit\`a degli Studi di Udine\\
     Via delle Scienze, 206\\
     33100 Udine --- Italia\\
