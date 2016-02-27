@@ -26,7 +26,7 @@
 \end{wrapfigure}
 
 In this chapter we present the most important parts of our implementation.
-At an high level the implementation is subdivided in an Haskell library and a C library.
+At a high level the implementation is subdivided in an Haskell library and a C library.
 The data structures, as well as the operations on them, are defined in the C Header file OTM.h and made available to the Haskell code through the Foreign Function Interface.
 Since the FFI does not provide a type safe marshaling for pointers, we decided to introduce the C2HS preprocessor to our build scheme.
 All the foreign declarations reside in the file Internals.chs and are written with the syntax of C2HS.\cite{Chakravarty2000}
@@ -54,7 +54,7 @@ evalITM itm s = runExceptT . flip evalStateT s $ unITM itm
 \end{figure}
 
 \section{Monads TM, OTM and ITM}
-The \emph{TM Monad} is the hearth of our transactional memory implementation;
+The \emph{TM Monad} is at the hearth of our transactional memory implementation;
 as shown in \cref{fig:monads}, the monads OTM and ITM are \emph{newtype} declarations that encapsulate a value of type \emph{TM a}.
 The \emph{TM Monad} is a type synonym for a stack of monad transformers that solve the following constraints:
 \begin{itemize}
@@ -108,16 +108,18 @@ The \emph{OTRec} and the \emph{OTVar} are allocated by the foreign code, but wra
 
 \section{Transaction life-cycle}
 
-The life-cycle of an \emph{Open Transaction} is quite complex compared to that of an \emph{Isolated Transactions}, for which can also be ignored.
+The life-cycle of an \emph{Open Transaction} is quite complex compared to that of an \emph{Isolated Transactions}, which will be omitted.
+
+The life-cycle of an open transaction is summarized by the automaton in \cref{fig:implementation-lifecycle}.
+In this automaton, each transition is labeled with a triple ``a;c;v'' where \emph{a} is the action (possibly with parameters), \emph{c} is a condition under which the action can be taken, and \emph{v} is the list of new values to put in the target state registers.
 
 The state of a running transaction is \emph{Ru\textlangle n, l\textrangle}, where \emph{n} is the number of threads that have not already voted to commit, and \emph{l} is the total number of threads participating to the transaction.
 This is the only state where new threads can be merged to the transaction. When a transaction is created, its state is \emph{Ru\textlangle 1, 1\textrangle}.
 When another transaction is merged, we add the registers componentwise; when a thread returns and hence is ready to commit, \emph{n} is decremented.
-If it is the one that zeros \emph{n}, the transaction is ready to commit: its state changes to \emph{Co\textlangle l, l\textrangle} , where every participant commits and decrements \emph{n}; eventually, we conclude the transaction by moving to state \emph{Co!\textlangle \textrangle} .
+If it is the one that zeros \emph{n}, the transaction is ready to commit: its state changes to \emph{Co\textlangle l, l\textrangle} , where every participant commits and decrements \emph{n}; eventually, we conclude the transaction by moving to state \emph{Co!\textlangle \textrangle}.
 If a thread executes a retry, the transaction moves immediately to state \emph{Re\textlangle l, l\textrangle} and waits that every other participant acknowledges the retry, decrementing \emph{n}, before restarting the transaction.
 The abort procedure (initiated by a throw) is analogous, apart from the fact that we have to propagate the exception \emph{e}.
-The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle}  and \emph{Re!\textlangle \textrangle}  identify the states of the machine when \emph{n} = 0 and the commit, abort or retry procedures are completed.
-
+The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle}  and \emph{Re!\textlangle \textrangle}  identify the states of the machine when \emph{n} = 0 and the commit, abort or retry procedures are completed, respectively.
 \begin{figure*}
     \centering
     \begin{tikzpicture}[
@@ -179,24 +181,19 @@ The states \emph{Co!\textlangle \textrangle }, \emph{Ab!\textlangle e\textrangle
     \label{fig:implementation-lifecycle}
 \end{figure*}
 
-The life-cycle of an open transaction is summarized by the automaton in \cref{fig:implementation-lifecycle}.
-In this automaton, each transition is labeled with a triple ``a;c;v'' where \emph{a} is the action (possibly with parameters), \emph{c} is a condition under which the action can be taken, and \emph{v} is the list of new values to put in the target state registers.
-
-
-
 \section{Validation and commit}
 
 Both \emph{atomic} and \emph{isolated} functions operate by executing the computation of type \emph{TM a} encapsulated inside a monadic value of type \emph{OTM a} and \emph{ITM a} by means the functions declared in \cref{fig:monads}; the validation phase is where the two functions differ.
 
-\begin{figure}
-\begin{lstlisting}[language=Haskell,showlines=false]
-otmCommit :: OTRec -> IO OTState
-otmRetry  :: OTRec -> IO OTState
-otmAbort  :: OTRec -> StablePtr SomeException -> IO OTState
-\end{lstlisting}
-\caption{Agreement interface}
-\label{fig:agreement}
-\end{figure}
+% \begin{figure}
+% \begin{lstlisting}[language=Haskell,showlines=false]
+% otmCommit :: OTRec -> IO OTState
+% otmRetry  :: OTRec -> IO OTState
+% otmAbort  :: OTRec -> StablePtr SomeException -> IO OTState
+% \end{lstlisting}
+% \caption{Agreement interface}
+% \label{fig:agreement}
+% \end{figure}
 
 \begin{figure}
 \begin{lstlisting}[language=Haskell]
@@ -224,12 +221,20 @@ atomic otm = do
 \end{figure}
 
 In the case of an \emph{Open Transaction}, the \emph{validation process} consists of two phases: a \emph{voting phase} and an \emph{agreement phase}.
-Each thread participating in a transaction, checks the value returned by the executed computation and vote accordingly to change the transaction state. The vote is expressed by means the functions in \cref{fig:agreement}, which initiate the \emph{validation phase} for the current thread.
+Each thread participating in a transaction, checks the value returned by the executed computation and vote accordingly to change the transaction state.
+\newpage
+The vote is expressed by means the functions:
+% in \cref{fig:agreement},
+\begin{lstlisting}[language=Haskell,showlines=false]
+otmCommit :: OTRec -> IO OTState
+otmRetry  :: OTRec -> IO OTState
+otmAbort  :: OTRec -> StablePtr SomeException -> IO OTState
+\end{lstlisting}
+which initiate the \emph{validation phase} for the current thread.
 
-%The execution of a value of type \emph{OTM a} may return an exception
-Regarding the \cref{fig:atomic}, if the transactional computation of type \emph{OTM a} ends without exceptional values, the thread calls \emph{otmCommit}: this foreign function decrements the counter of running threads, and sleeps as long as the state of the transaction remain \emph{Ru\textlangle \_,\_\textrangle}, waiting the vote of the other participating threads.
+Regarding \cref{fig:atomic}, if the transactional computation of type \emph{OTM a} ends without exceptional values, the thread calls \emph{otmCommit}: this foreign function decrements the counter of running threads, and sleeps as long as the state of the transaction remain \emph{Ru\textlangle \_,\_\textrangle}, waiting the vote of the other participating threads.
 When the state changes, it means that the transaction's \emph{voting phase} ended and the threads have agreed on one of the states \emph{Co\textlangle n, l\textrangle}, \emph{Re\textlangle n, l\textrangle} or \emph{Ab\textlangle n, l\textrangle}.
-If the new state is \emph{Co\textlangle n, l\textrangle}, the transaction initiate the \emph{committing phase} and the value \emph{n} represents the numebr of threads that have to commit their working memory.
+If the new state is \emph{Co\textlangle n, l\textrangle}, the transaction initiate the \emph{committing phase} and the value \emph{n} represents the number of threads that have to commit their working memory.
 Each thread updates the \emph{current value} of the \emph{OTVars} in its transactional record with the value held by the \emph{delta memory}. When a thread updates all the variables in its transactional log, it acknowledges the transaction decrementing the number of \emph{committing threads}.
 If the \emph{agreed} state is one of \emph{Re\textlangle n, l\textrangle} and \emph{Ab\textlangle n, l\textrangle} the transactional record is discarded, the threads disjointed, and the transaction re-executed. The re-execution of a transaction is managed by the function:
 \begin{lstlisting}
@@ -275,6 +280,7 @@ HsStablePtr otmReadOTVar(OTRecHeader* trec, OTVar* otvar) {
 \end{lstlisting}
 \caption{Open read of an OTVar}
 \label{fig:otmread}
+\vspace{-5pt}
 \end{figure}
 
 The first time an \emph{OTVar} is accessed, it is \emph{acquired} by the transaction that requested the operation: its \emph{delta memory}, initially empty, is filled in with an \emph{OTVarDelta} containing the \emph{shared value} and a reference to the transaction which is acquiring the variable.
@@ -333,9 +339,9 @@ HsBool otmUnion(OTRecHeader* trec1, OTRecHeader* trec2){
 
 When a transaction reads or writes an owned \emph{OTVar}, the function \emph{otmUnion} is called (\cref{fig:otmread} line 10).
 To represent transaction merges we opted for a Union-Find data structure with the heuristics of \emph{path compression} and \emph{union by rank}.
-Each transactional record has a \emph{forward transaction} field that stores the information needed by the data structure: the \emph{rank} of that node and a reference to the \emph{root} of the set.
+Each transactional record has a \emph{forward transaction} field that stores the information needed by the data structure: the \emph{rank} of that node and a \emph{reference} to the \emph{root} of the set.
 We followed the implementation proposed by \citet{Anderson94wait-freeparallel} where operations on the data structure are lock free.
-Adapting their implementation to our needs, introduced the lock of the root nodes involved in the \emph{union} procedure, but \emph{find} operations are still lock free.
+To adapt their implementation to our needs, we introduced the lock of the root nodes involved in the \emph{union} procedure. Unlike a normal Union-Find, when two root nodes are merged, we have to update both: in one the \emph{forward transaction} field and in the other the number of participating threads. This entails the inevitable use of locks.
 
 The \emph{otmUnion} function is shown in \cref{fig:otmunion}. It acquires the locks on the transactional records that have to be merged and performs a union by rank. If the union succeeds, the number of running and participating threads of one transaction is added to that of the new root transaction. The transactional log that is no longer representing a transaction, becomes a mere node of the Union-Find with the unique scope of referencing the root of the set. Attempting to merge transactions that are not in the \emph{Ru\textlangle n, l\textrangle} state, causes the union process failure (lines 23-28).
 

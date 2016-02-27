@@ -14,15 +14,6 @@ Two features make it stand out amongst the programming languages crowd:
 I/O operations do not fit the functional paradigm because side effects are not permitted and laziness gives deliberately unspecified order of evaluation.
 
 In Haskell, reconciling I/O operations with this features has been achieved by means the IO monad \cite{PeytonJones:1993:IFP:158511.158524}.
-%\todo{A monad is \url{https://en.wikipedia.org/wiki/Monad\_(functional\_programming)\#Formal\_definition} data constructor, bind and return. Monad laws.
-% A type to be defined a \emph{monad} must have the following components:
-% \begin{itemize}
-% \item A data constructor.
-% \item A unit function that injects a type in the corresponding monadic type.
-% \item A binding operation to combine two monadic actions.
-% \end{itemize}
-% }
-%\todo{IO newtype, token state RealWord \url{https://www.fpcomplete.com/blog/2015/02/primitive-haskell}}
 \begin{figure}
 \begin{lstlisting}
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))

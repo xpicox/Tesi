@@ -16,6 +16,6 @@ A solution has already been found and the data structures are designed to suppor
 Furthermore, nested transaction must be added to both isolated and non isolated execution environments.
 Nested isolated transaction can be easily integrated in ITM because the data structures do not need further modification; much more work would be required to implement nested open transactions.
 
-From the implementation of \citet{Toneguzzo} we moved a little closer to the Haskell RTS, but further optimizations can be achieved by implementing transactions and OTVars directly in the runtime, along the lines of the implementation of \emph{STM} in the Glasgow Haskell Compiler.
+Starting from the Toneguzzo's implementation we moved closer to the Haskell RTS, but further optimizations can be achieved by implementing transactions and OTVars directly in the runtime, along the lines of the implementation of \emph{STM} in the Glasgow Haskell Compiler.
 
 We have presented OTM within Haskell (especially to leverage its type system), but this model is general and can be applied to other STM implementations. A possible future work is to port this model to an imperative object oriented language, such as Java or C++; like other TM implementations, we expect that this extension will require some changes in the compiler and/or the runtime. 

@@ -163,7 +163,7 @@ The Foreign Function Interface (FFI) allows Haskell programs to cooperate with l
 Haskell programs can call foreign functions and foreign functions can call Haskell code.
 The FFI defines the marshaling for some boxed types such us Int, Double, Char and exports un-boxed foreign types that map directly to C types such as Int64, for signed 64-bit integers, Word64, for unsigned 64-bit integers, Ptr a, for pointers, and FunPtr a, for function pointers.
 
-The syntax for declaring a foreign import let decide the behavior of the runtime when a call to the C function is made:
+The syntax for declaring a foreign import allows decide the behavior of the runtime when a call to the C function is made:
 \begin{itemize}
 \item If the import is marked as \emph{safe}, then the runtime pushes the arguments onto the Haskell stack and returns a C function descriptor to the scheduler.
 The scheduler suspends the Haskell thread, spawns a new OS thread which pops the arguments off the Haskell stack onto the C stack, calls the C function, pushes the result onto the Haskell stack and informs the scheduler that the C function has completed and the Haskell thread is now runnable.
