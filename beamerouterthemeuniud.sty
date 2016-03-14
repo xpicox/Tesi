@@ -1,0 +1,53 @@
+% TeX root = slides.tex
+
+\newcommand{\UniudHeadline}{%
+    \pgfmathsetmacro\fnum{int(\insertframenumber - 1)}
+    \pgfmathsetmacro\totfnum{int(\inserttotalframenumber - 2)}
+    \begin{tikzpicture}
+    \newcommand\barheight{9}
+        \useasboundingbox (0,0) rectangle(\the\paperwidth,\the\paperheight);
+        \fill[color=uniud-brown] (-1.5,\barheight) rectangle (-0.35, \the\paperheight);
+        \fill[color=uniud-orange] (-0.35,\barheight) rectangle (10.60, \the\paperheight);
+        \fill[color=uniud-blue] (10.60,\barheight) rectangle (\the\paperwidth, \the\paperheight);
+        \node[anchor=west,white, font=\small] at (-0.30,9.29)
+            {\headercontents};
+        \node[anchor=west,white, font=\small] at (10.6,9.29)
+            {\fnum/\totfnum};
+        \node[anchor=west] at (-1, 9.29){\includegraphics[width=11pt]{pollo-light.pdf}};
+    \end{tikzpicture}
+}
+
+\setbeamertemplate{headline}[text line]{
+    \ifnum\thepage>1\relax
+        \ifprintheader
+            \UniudHeadline
+        \fi
+    \fi
+}
+
+% Frame title
+\defbeamertemplate*{frametitle}{uniud}[1][]
+{
+    \vskip0.8cm
+    \hskip -0.5cm \insertframetitle
+    \if\insertframesubtitle\@empty\else
+        \vskip0.1cm
+        \hskip -0.5cm \small\insertframesubtitle
+    \fi
+%\vskip1cm%
+%  \begin{beamercolorbox}[wd=\paperwidth,ht=1.2cm]{frametitle}
+%  \begin{tikzpicture}
+%  \useasboundingbox[fill=white](0,0) rectangle(\the\paperwidth,1.2);
+%  \fill[uniud-brown] (0,0) rectangle(2.95,1.2);
+%  \fill[blue!50!cyan!80] (3.05,0) rectangle(\the\paperwidth,1.2);
+%   \ifx\insertframesubtitle\@empty%
+%      {\node[anchor=west, white,font=\large] at (3.2,0.61){\insertframetitle};}
+%      \else%
+%      {\node[anchor= west, white,font=\large] at (3.2,0.81){\insertframetitle};%
+%       \node[anchor= west, white,font=\small] at (3.2,0.41){\insertframesubtitle};}%
+%      \fi
+%  \end{tikzpicture}
+%  \end{beamercolorbox}
+}
+
+\mode<all>

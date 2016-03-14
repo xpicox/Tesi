@@ -1,0 +1,39 @@
+
+\RequirePackage{tikz}
+\RequirePackage{pgf}
+\RequirePackage[absolute,overlay]{textpos}
+  \setlength{\TPHorizModule}{1mm}
+  \setlength{\TPVertModule}{1mm}
+\RequirePackage{etoolbox}
+
+
+\let\@oldsection\section
+\renewcommand{\section}[1]{
+  \renewcommand{\headercontents}{#1}
+  \@oldsection{#1}
+}
+
+\let\@oldsubsection\subsection
+\renewcommand{\subsection}[1]{
+  \renewcommand{\headercontents}{#1}
+  \@oldsubsection{#1}
+}
+
+\newcommand\fakesubsection[1]{
+  \refstepcounter{subsection}
+  \addtocontents{toc}{\protect\beamer@subsectionintoc{\the\c@section}{\the\c@subsection}{#1}{\the\c@page}{\the\c@part}{\the\beamer@tocsectionnumber}}
+}
+
+\newif\ifprintheader
+\printheadertrue
+
+\newcommand{\headercontents}{\@empty}
+
+\usecolortheme{uniud}
+\useinnertheme{uniud}
+\useoutertheme{uniud}
+
+\setbeamertemplate{navigation symbols}{}
+%\setbeamertemplate{blocks}[rounded][shadow=true]
+
+

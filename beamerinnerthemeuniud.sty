@@ -1,0 +1,60 @@
+\mode<presentation>
+
+\RequirePackage{array}
+
+\setbeamertemplate{background}{
+  \ifnum\thepage=1\relax%
+    \begin{tikzpicture}
+      \useasboundingbox (0,0) rectangle(\the\paperwidth,\the\paperheight);
+      \fill[color=uniud-brown] (0,1.8) rectangle (3, \the\paperheight);
+      \fill[color=uniud-orange] (0,0) rectangle (3,1.7);
+      \fill[color=uniud-blue] (3.1,0) rectangle(\the\paperwidth,1.7);
+      \node[anchor=west] at (0.15, 8){\includegraphics[width=2.5cm]{pollo-light.pdf}};
+    \end{tikzpicture}
+  \fi
+}
+
+\newcommand\theauthor\relax
+\newcommand\thesupervisor\relax
+\newcommand\thecosupervisor\relax
+
+\renewcommand\author[1]{\renewcommand\theauthor{#1}}
+\renewcommand\supervisor[1]{\renewcommand\thesupervisor{#1}}
+\renewcommand\cosupervisor[1]{\renewcommand\thecosupervisor{#1}}
+
+% Title page
+\defbeamertemplate*{title page}{uniud}[1][]
+{
+    \vskip -0.5cm%
+    \hskip 2.5cm%
+    \begin{minipage}[t]{0.64\paperwidth}
+      \small
+      \begingroup
+      \rmfamily\scshape
+      \centering
+        Università degli Studi di Udine\\
+        Dipartimento di Scienze \\ Matematiche, Informatiche e Fisiche\\
+        Corso di Laurea in Informatica\\
+      \endgroup
+
+      \vspace{0.5cm}
+
+      \begin{center}
+        \usebeamerfont{title}\inserttitle
+      \end{center}
+
+      \vspace{0.5cm}
+
+      \renewcommand\and{\\&}
+      \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+      {\rmfamily\scshape Candidate:} & {\rmfamily\scshape Supervisor:} \\
+      \theauthor  & \thesupervisor \\
+                  & \phantom{.}              \\
+                  & {\rmfamily\scshape Co-Supervisors:} \\
+                  & \thecosupervisor
+      \end{tabular*}
+   \end{minipage}
+  \vfill
+}
+
+\mode<all>
