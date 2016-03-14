@@ -7,7 +7,7 @@ We have presented OTM, a programming model supporting  interactions between comp
 This model separates isolated transactions from non-isolated ones, still guaranteeing atomicity; non-isolated transactions can interact by accessing to shared variables.
 Consistency is ensured by transparently \emph{merge} interacting transactions at runtime.  
 We have showed the versatility and simplicity of OTM by implementing several fundamental communication idioms (such as producer-consumer, futures, barriers, etc.) and some examples which are incompatible with isolation.
-Then, we have provided an Haskell implementation of OTM as a library independent from \emph{STM}, that maintain the same interface against both the user of the library and the Haskell Runtime System; in fact, \emph{OTM} is a conservative extension of \emph{STM}.
+Then, we have provided an Haskell implementation of OTM as a library independent from \emph{STM}, that maintains the same interface against both the user of the library and the Haskell Runtime System; in fact, \emph{OTM} is a conservative extension of \emph{STM}.
 
 A first direction for future work concerns the implementation.
 One possibility is to add some heuristics to better handle \emph{retry} events.
