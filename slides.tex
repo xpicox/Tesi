@@ -46,10 +46,6 @@
 %% \maketitle accetta gli stessi argomenti opzionali di \begin{frame} (p.es. "[plain]")
 \maketitle
 
-\begin{frame}
-\tableofcontents
-\end{frame}
-
 %% Sezione
 \section{Introduction}
 
@@ -65,28 +61,27 @@
 
 \emph{Transactional Memory} (TM) has emerged as a promising alternative to traditional \emph{lock-based} synchronization.
 
-Advantages of TM:
-\begin{itemize}
-\item Lock-free programming
-\item Avoids deadlocks, race conditions and priority inversions
-\item Composability and scalability
-\item Exploit multi-core architectures
-\end{itemize}
+Blocks of code are marked as \emph{atomic} and their execution will appear either if it was performed instantaneously at some unique point in time, or, if aborted, as if it never happened.
+% Advantages of TM:
+% \begin{itemize}
+% \item Lock-free programming
+% \item Avoids deadlocks, race conditions and priority inversions
+% \item Composability and scalability
+% \item Exploit multi-core architectures
+% \end{itemize}
 \end{frame}
 
 %% Sottosezione
 %\subsection{Sottosezione}
-\begin{frame}{Transactional Memory: the idea}
-The blocks of code are marked as \emph{atomic} and their execution will appear either if it was performed instantaneously at some unique point in time, or, if aborted, as if it never happened.
-\end{frame}
+% \begin{frame}{Transactional Memory: the idea}
+
+% \end{frame}
 
 %\subsection{The problem}
 
-\begin{frame}{The problem}
+\begin{frame}[fragile]{The problem with interacting transactions}
 Most TM models admit only \emph{isolated} transactions, which are not adequate in multi-threaded programming where transactions have to interact via shared data \emph{before} committing.
-\end{frame}
 
-\begin{frame}[fragile]{Example}
 A simple example is a request-response interaction via a shared buffer. Synchronization is required to regulate accesses to the buffer.
 
 \begin{figure}
@@ -117,50 +112,70 @@ atomically {
 \end{BVerbatim}
 \end{minipage}
 \end{figure}
-\note{Any admissible execution requires an interleaved scheduling between the two transactions, thus violating isolation}
-\note{Deadlock arises only because we are inside isolated transactions, the solution above is fine for threads outside transactions or within the same transaction}
 \end{frame}
+
+% \begin{frame}[fragile]{Example}
+
+% \note{Any admissible execution requires an interleaved scheduling between the two transactions, thus violating isolation}
+% \note{Deadlock arises only because we are inside isolated transactions, the solution above is fine for threads outside transactions or within the same transaction}
+% \end{frame}
 
 %\subsection{Thesis proposal}
-\begin{frame}{Thesis proposal}
-The key observation is that \emph{atomicity} and \emph{isolation} should be seen as two disjoint computational aspects.
+% \begin{frame}{Thesis proposal}
+% The key observation is that \emph{atomicity} and \emph{isolation} should be seen as two disjoint computational aspects.
 
-\begin{itemize}
-\item<2->{an atomic \emph{non-isolated} block is executed ``all-or-nothing''}
-\note{but its execution can overlap that of others and uncontrolled acces to shared data is allowed}
-\item<3->{an \emph{isolated} block of code is executed ``as it were the only one''}
-\end{itemize}
-\end{frame}
+% \begin{itemize}
+% \item<2->{an atomic \emph{non-isolated} block is executed ``all-or-nothing''}
+% \note{but its execution can overlap that of others and uncontrolled acces to shared data is allowed}
+% \item<3->{an \emph{isolated} block of code is executed ``as it were the only one''}
+% \end{itemize}
+% \end{frame}
 
-\begin{frame}[fragile]{Open transactions}
-Atomic non-isolated blocks can be used for implementing safe composable interacting memory transactions, called \emph{open transactions}.
+% \begin{frame}[fragile]{Open transactions}
+% Atomic non-isolated blocks can be used for implementing safe composable interacting memory transactions, called \emph{open transactions}.
 
 
-\begin{figure}
-\centering
+% \begin{figure}
+% \centering
 
-\begin{tabular}{ c | c | c |}
-\cline{2-3}
-& non-atomic & atomic \\
-\hline
-\multicolumn{1}{|c|}{isolated} & mutex block & TM\\
-\hline
-\multicolumn{1}{|c|}{non-isolated} & Normal block & Open transactions\\
-\hline
-\end{tabular}
-\end{figure}
+% \begin{tabular}{ c | c | c |}
+% \cline{2-3}
+% & non-atomic & atomic \\
+% \hline
+% \multicolumn{1}{|c|}{isolated} & mutex block & TM\\
+% \hline
+% \multicolumn{1}{|c|}{non-isolated} & Normal block & Open transactions\\
+% \hline
+% \end{tabular}
+% \end{figure}
 
-\end{frame}
+% \end{frame}
 
 \section{OTM}
 
 \begin{frame}{OTM}
-\emph{Open Transactional Memory} (OTM) is the model that implements \emph{open transactions}. \onslide<2->{In this model:}
+\emph{Open Transactional Memory} (OTM) is the model that implements \emph{open transactions}. In this model:%\onslide<2->{In this model:}
 \begin{itemize}
-\item<2-> a transaction is composed by several threads, called \emph{participants}
-\item<3-> a transaction commits when all its participants commit, and aborts if any thread aborts
-\item<4-> accesses to shared data cause transactions to be \emph{transparently merged} into a single one
+\item%<2->
+a transaction is composed by several threads, called \emph{participants}
+\item%<3->
+a transaction commits when all its participants commit, and aborts if any thread aborts
+\item%<4->
+accesses to shared data cause transactions to be \emph{transparently merged} into a single one
 \end{itemize}
+
+\begin{figure}
+\centering
+\begin{tabular}{ c | c | c |}
+\cline{2-3}
+& non-atomic & atomic \\
+\hline
+\multicolumn{1}{|c|}{non-isolated} & Normal block & Open transactions\\
+\hline
+\multicolumn{1}{|c|}{isolated} & mutex block & TM\\
+\hline
+\end{tabular}
+\end{figure}
 \end{frame}
 
 %\subsection{OTM in Haskell}
@@ -218,19 +233,6 @@ Accesses to transactional variables:
             readOTVar    :: OTVar a -> m a
             writeOTVar   :: OTVar a -> a -> m ()
 \end{Verbatim}
-\end{frame}
-
-\begin{frame}[fragile]{OTM interface: transactional memory}
-Example of an isolated update:
-\begin{Verbatim}[tabsize=3, gobble=2]
-        modifyOTVar :: OTVar a -> (a -> a) -> ITM ()
-        modifyOTVar var f = do
-            x <- readOTVar var
-            writeOTVar var (f x)
-\end{Verbatim}
-\end{frame}
-
-\begin{frame}[fragile]{OTM interface: running transactions}
 Running isolated and atomic computations:
 \begin{Verbatim}[tabsize=3, gobble=2]
         atomic   :: OTM a -> IO a
@@ -242,27 +244,91 @@ Equivalence with other TM implementations:
 \end{Verbatim}
 \end{frame}
 
+% \begin{frame}[fragile]{OTM interface: transactional memory}
+% Example of an isolated update:
+% \begin{Verbatim}[tabsize=3, gobble=2]
+%         modifyOTVar :: OTVar a -> (a -> a) -> ITM ()
+%         modifyOTVar var f = do
+%             x <- readOTVar var
+%             writeOTVar var (f x)
+% \end{Verbatim}
+% \end{frame}
+
+% \begin{frame}[fragile]{OTM interface: running transactions}
+% Running isolated and atomic computations:
+% \begin{Verbatim}[tabsize=3, gobble=2]
+%         atomic   :: OTM a -> IO a
+%         isolated :: ITM a -> OTM a
+% \end{Verbatim}
+% Equivalence with other TM implementations:
+% \begin{Verbatim}[tabsize=3, gobble=2]
+%         atomically = atomic . isolated
+% \end{Verbatim}
+% \end{frame}
+
 \begin{frame}[fragile]{OTM implementation}
-Modules dependency:
+%Modules dependency:
+% \begin{figure}
+% \centering
+%     \begin{tikzpicture}[
+%             lbl/.style={
+%               text width=2.9cm,
+%               align=center
+%             }
+%         ]
+%     \def\h{4cm}
+%     \draw (0,0) rectangle (3,\h) {};
+
+%     \foreach \i in {1,2,3}
+%       \draw (0,{\i*\h/4}) -- +(3,0) {};
+
+%     \foreach \i/\n in {0/RTS, 1/C Library, 2/FFI, 3/OTM Haskell Interface}
+%         \node[lbl] at (1.5,{\h/8 + \i*\h/4}) {\n};
+
+%     \end{tikzpicture}
+% \end{figure}
+
 \begin{figure}
 \centering
-    \begin{tikzpicture}[
+\begin{tikzpicture}[
             lbl/.style={
-              text width=2.9cm,
-              align=center
+              text width=2cm,
+              %align=center
+            },
+            lbll/.style={
+              font=\scriptsize\ttfamily,
+              text width=5cm,
+              align=left
             }
         ]
-    \def\h{4cm}
-    \draw (0,0) rectangle (3,\h) {};
+\def\h{8cm}
+\def\w{0.7\textwidth}
+\foreach \i in {1, 2, 3%, 4
+}
+    \draw (0, {\i*\h/5}) -- +(\w, 0) {};
 
-    \foreach \i in {1,2,3}
-      \draw (0,{\i*\h/4}) -- +(3,0) {};
+\foreach \i/\n in {0/GHC RTS, 1/C Library, 2/FFI, 3/OTM\\Interface%, 4/Haskell \\program
+}
+    \node[lbl] at (1, {\h/10 + \i*\h/5}) {\n};
 
-    \foreach \i/\n in {0/RTS, 1/C Library, 2/FFI, 3/OTM Haskell Interface}
-        \node[lbl] at (1.5,{\h/8 + \i*\h/4}) {\n};
+\foreach \i/\n in {0/ , 1/otmReadOTVar(OTRec* trec OTVar* otvar)\\struct OTVar\\struct OTRec, 2/foreign import ccall "otmReadOTVar", 3/readOTVar :: OTVar a -> OTM a\\readOTVar = otmReadOTVar%, 4/f :: OTM Int
+}
+    \node[lbll] at ({0.5*\w+1cm}, {\h/10 + \i*\h/5}) {\n};
 
-    \end{tikzpicture}
+\end{tikzpicture}
 \end{figure}
+\end{frame}
+
+\begin{frame}[fragile]{OTM implementation: read of an open transaction}
+Function defined by the C Library:
+\begin{verbatim}
+HsValue otmReadOTVar(OTRec* otrec, OTVar* otvar) {
+    
+    otmUnion(otrec, otvar -> trec);
+
+    return otvar -> new_value;
+}
+\end{verbatim}
 \end{frame}
 
 \begin{frame}[fragile]{OTM implementation: merge of transactions}
@@ -272,6 +338,7 @@ Modules dependency:
 \item Merge of transactions are handled with an Union-find data structure.
 \item Union-by-rank and path compression heuristics are applied.
 \end{itemize}
+\note{m make-union-find, di cui n make O(m * a(n))}
 \begin{figure}
     \begin{tikzpicture}
     \node [nodesr, label=left:$n_{1}$] (n1) at (1,2) {$k_{1}$};
@@ -352,6 +419,11 @@ The Haskell implementation is a conservative extension of STM:
 \item Semantically \emph{atomically = atomic . isolated}
 \item From the user point of view, the libraries have the same interface
 \item From the implementation point of view, we provide the same interface of STM against the runtime system
+\end{itemize}
+Future works:
+\begin{itemize}
+\item Implement an efficient retry mechanism for transactions
+\item Comparison test with Haskell STM
 \end{itemize}
 \end{frame}
 
